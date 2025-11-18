@@ -1,20 +1,20 @@
-{{- if .Values.services.authoriumapp.create }}
+{{- if .Values.services.appsidekiq.create }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}
-  namespace: {{ .Values.services.authoriumapp.namespace }}
+  namespace: {{ .Values.services.appsidekiq.namespace }}
   labels:
     app: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ .Release.Name }}
     rubix-app: {{ .Chart.Name }}
-  {{- with .Values.services.authoriumapp.deployment.annotations }}
+  {{- with .Values.services.appsidekiq.deployment.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  replicas: {{ .Values.services.authoriumapp.deployment.replicas }}
+  replicas: {{ .Values.services.appsidekiq.deployment.replicas }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}
@@ -38,7 +38,7 @@ spec:
                 "ProductName": "{{ .Chart.Name }}",
                 "ProductVersion": "{{ .Chart.AppVersion }}"
               },
-              "authorium-app": {
+              "appsidekiq-app": {
                 "ProductName": "{{ .Chart.Name }}",
                 "ProductVersion": "{{ .Chart.AppVersion }}"
               }
@@ -46,8 +46,8 @@ spec:
           }
         com.palantir.rubix.service/pod-cert: '{}'
     spec:
-      automountServiceAccountToken: {{ .Values.services.authoriumapp.serviceaccount.automountServiceAccountToken }}
-      serviceAccountName: "{{ .Values.services.authoriumapp.serviceaccount.name }}"
+      automountServiceAccountToken: {{ .Values.services.appsidekiq.serviceaccount.automountServiceAccountToken }}
+      serviceAccountName: "{{ .Values.services.appsidekiq.serviceaccount.name }}"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -88,8 +88,8 @@ spec:
               app.kubernetes.io/instance: {{ .Release.Name }}
       initContainers:
         - name: ca-bundle
-          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.services.appsidekiq.deployment.image.repository }}:{{ .Values.services.appsidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/bash","-lc"]
           args:
             - |
@@ -133,11 +133,11 @@ spec:
               done
               echo "ERROR: could not reach DB in time"; exit 1
           env:
-            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            {{- range .Values.services.appsidekiq.deployment.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
-            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
@@ -154,10 +154,10 @@ spec:
               readOnly: false
       containers:
         - name: nginx
-          image: "{{ .Values.services.authoriumapp.deployment_nginx.image.repository }}:{{ .Values.services.authoriumapp.deployment_nginx.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment_nginx.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.services.appsidekiq.deployment_nginx.image.repository }}:{{ .Values.services.appsidekiq.deployment_nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment_nginx.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.services.authoriumapp.deployment_nginx.containerPort }}
+            - containerPort: {{ .Values.services.appsidekiq.deployment_nginx.containerPort }}
               protocol: TCP
               name: http-svc
           volumeMounts:
@@ -168,24 +168,24 @@ spec:
               mountPath: /etc/ssl/
               readOnly: true
           env:
-            {{- range $key, $value := .Values.services.authoriumapp.deployment_nginx.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment_nginx.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
                   name: {{ $value.name }}
                   key: {{ $value.key }}
             {{- end }}
-            {{- range .Values.services.authoriumapp.deployment_nginx.config.env }}
+            {{- range .Values.services.appsidekiq.deployment_nginx.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
           resources:
             requests:
-              memory: {{ .Values.services.authoriumapp.deployment_nginx.resources.requests.memory }}
-              cpu: {{ .Values.services.authoriumapp.deployment_nginx.resources.requests.cpu }}
+              memory: {{ .Values.services.appsidekiq.deployment_nginx.resources.requests.memory }}
+              cpu: {{ .Values.services.appsidekiq.deployment_nginx.resources.requests.cpu }}
             limits:
-              memory: {{ .Values.services.authoriumapp.deployment_nginx.resources.limits.memory }}
-              cpu: {{ .Values.services.authoriumapp.deployment_nginx.resources.limits.cpu }}
+              memory: {{ .Values.services.appsidekiq.deployment_nginx.resources.limits.memory }}
+              cpu: {{ .Values.services.appsidekiq.deployment_nginx.resources.limits.cpu }}
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -197,14 +197,14 @@ spec:
             seccompProfile:
               type: RuntimeDefault
 
-        - name: authorium-app
-          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+        - name: appsidekiq-app
+          image: "{{ .Values.services.appsidekiq.deployment.image.repository }}:{{ .Values.services.appsidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.services.authoriumapp.deployment.containerPort }}
+            - containerPort: {{ .Values.services.appsidekiq.deployment.containerPort }}
               protocol: TCP
           volumeMounts:
-          {{- if .Values.services.authoriumapp.storage.persistence.enabled }}
+          {{- if .Values.services.appsidekiq.storage.persistence.enabled }}
             - name: data-volume
               mountPath: /db/
           {{- end }}
@@ -218,11 +218,11 @@ spec:
               subPath: ca.pem
               readOnly: true
           env:
-            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            {{- range .Values.services.appsidekiq.deployment.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
-            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
@@ -231,8 +231,8 @@ spec:
             {{- end }}
           resources:
             limits:
-              cpu: {{ .Values.services.authoriumapp.deployment.resources.limits.cpu }}
-              memory: {{ .Values.services.authoriumapp.deployment.resources.limits.memory }}
+              cpu: {{ .Values.services.appsidekiq.deployment.resources.limits.cpu }}
+              memory: {{ .Values.services.appsidekiq.deployment.resources.limits.memory }}
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -254,17 +254,17 @@ spec:
             timeoutSeconds: 10
             failureThreshold: 3 
       volumes:
-      {{- if .Values.services.authoriumapp.storage.persistence.enabled }}
+      {{- if .Values.services.appsidekiq.storage.persistence.enabled }}
         - name: data-volume
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-pvc
       {{- end }}
         - name: tls-secret-volume
           secret:
-            secretName: cert-authorium-app-sidekiq
+            secretName: cert-appsidekiq-appsidekiq
         - name: redis-ca
           secret:
-            secretName:  cert-authorium-app-redis-4
+            secretName:  cert-appsidekiq-app-redis-4
             items:
               - key: tls.crt
                 path: tls.crt

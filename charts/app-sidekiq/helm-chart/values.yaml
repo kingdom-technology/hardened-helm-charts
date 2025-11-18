@@ -1,17 +1,17 @@
 services:
 
-  authoriumapp:
+  appsidekiq:
     create: true
     migrate: false
     dbconfig: false
     initialuser: false
 
-    namespace: authorium
+    namespace: <namespace>
 
     deployment_nginx:
       replicas: 1
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
         tag: "1.29.3-202511.2725-alpine"
         pullPolicy: Always
       containerPort: 8443
@@ -51,7 +51,7 @@ services:
     deployment:
       replicas: 2
       image:
-        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/authorium-staging
+        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/appsidekiq-staging
         #tag: "1.16.0-il5"
         tag: "1.14.3"
         pullPolicy: Always
@@ -65,35 +65,35 @@ services:
         env:
           #### Integration URLs and Settings ####
         - name: CKEDITOR_API_URL
-          value: "https://authorium-editor-stg.palantirfedstart.com/api/v5"
+          value: ""
         - name: CKEDITOR_UPLOAD_URL
-          value: "https://authorium-editor-stg.palantirfedstart.com/easyimage/upload/"
+          value: ""
         - name: CKEDITOR_WEBSOCKET_URL
-          value: "wss://authorium-editor-stg.palantirfedstart.com/ws"
+          value: ""
         - name: CKEDITOR_DOCX_API_VERSION
           value: "v2"
         - name: CKEDITOR_DOCX_CONVERTER_BASE_URL
-          value: "https://authorium-docs-stg.palantirfedstart.com/v2/convert/docs"
+          value: ""
         - name: WRITEDOCS_SITE_URL
-          value: "https://authorium-docs-proxy-stg-01.authorium.com/"
+          value: ""
         - name: ADOBE_SIGN_URL
-          value: "https://secure.na4.adobesign.com"
+          value: ""
         - name: DOCUSIGN_APP_LINK
-          value: "https://apps-d.docusign.com"
+          value: ""
         - name: WPROOFREADER_SERVICE_URL
-          value: "https://authorium-spellcheck-stg.palantirfedstart.com/wscservice/wscbundle/wscbundle.js"
+          value: ""
         - name: FORMIO_BASE_URL
-          value: "https://authorium-forms-stg.palantirfedstart.com/"
+          value: ""
         - name: GENAI_API_HOST
-          value: "https://ai-authorium-stg-01.secure.authorium.com"
+          value: ""
         - name: HOST
-          value: "authorium-app-stg.palantirfedstart.com"
+          value: ""
         - name: FORMIO_STAGE_ID
-          value: "staging"
+          value: ""
         - name: SCOUT_APM_ENABLED
-          value: "true"
+          value: ""
         - name: LEGISCAN_CACHE_DURATION
-          value: "24"
+          value: ""
         #### AWS Settings ####
         - name: AWS_REGION
           value: "us-gov-west-1"
@@ -102,11 +102,11 @@ services:
         - name: AWS_EC2_METADATA_DISABLED
           value: "true"
         - name: AWS_S3_BUCKET
-          value: "391c760e-authorium-app20250917150043504800000001"
+          value: ""
         - name: AWS_WEB_IDENTITY_TOKEN_FILE
           value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
         - name: AWS_ROLE_ARN
-          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-fedstart-default-role-04770bd5"
+          value: ""
         - name: AWS_USE_FIPS_ENDPOINT
           value: "true"
           #### Application Settings ####
@@ -128,7 +128,7 @@ services:
           value: "true"
           #### Database Settings ####
         - name: DATABASE_NAME
-          value: "authoriumstgdata"
+          value: ""
         - name: DATABASE_USER
           value: "postgres"
         - name: TEMP_CONGA_ORG_ID
@@ -145,79 +145,58 @@ services:
           value: /etc/ssl/custom/combined.pem
         secrets:
           REDIS_PASSWORD:
-            name: authorium-app-redis
+            name: appsidekiq-app-redis
             key: redis-password
           REDIS_URL:
-            name: authorium-redis-url
+            name: appsidekiq-redis-url
             key: REDIS_URL
-          AUTHORIUM_ADMIN_PASSWORD:
-            name: authorium-app-sidekiq-secrets
-            key: AUTHORIUM_ADMIN_PASSWORD
+          appsidekiq_ADMIN_PASSWORD:
+            name: appsidekiq-app-sidekiq-secrets
+            key: appsidekiq_ADMIN_PASSWORD
           DATABASE_HOST:
-            name: authorium-app-sidekiq-secrets
-            key: AUTHORIUM_WEB_HOST
+            name: appsidekiq-app-sidekiq-secrets
+            key: appsidekiq_WEB_HOST
           DATA_WAREHOUSE_DATABASE_SCHEMA:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: DATA_WAREHOUSE_DATABASE_SCHEMA
           DATA_WAREHOUSE_DATABASE_URL:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: DATA_WAREHOUSE_DATABASE_URL            
           DATABASE_PASSWORD:
-            name: authorium-app-sidekiq-secrets
-            key: AUTHORIUM_WEB_PASSWORD
+            name: appsidekiq-app-sidekiq-secrets
+            key: appsidekiq_WEB_PASSWORD
           RAILS_MASTER_KEY:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: RAILS_MASTER_KEY 
           FORMIO_ADMIN_ROLE_ID:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: FORMIO_ADMIN_ROLE_ID 
           FORMIO_JWT_SECRET_KEY:
             name: formio-enterprise-secrets
             key: FORMIO_JWT_SECRET_KEY
           FORMIO_PROJECT_ID:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: FORMIO_PROJECT_ID
           CKEDITOR_ENV_ID:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: CKEDITOR_ENV_ID
           CKEDITOR_SECRET_KEY:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: CKEDITOR_SECRET_KEY
           CKEDITOR_API_SECRET:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: CKEDITOR_API_SECRET
           CKEDITOR_EXPORT_DOCX_SECRET_KEY:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: CKEDITOR_EXPORT_DOCX_SECRET_KEY
           DOCUSIGN_BASE_URL:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: DOCUSIGN_BASE_URL
-          #ETLWORKS_SITE_URL:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: ETLWORKS_SITE_URL
-          #ETLWORKS_SSO_KEY:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: ETLWORKS_SSO_KEY
-          #GENAI_JWT_SECRET:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: JWT_SECRET
-          #METABASE_SITE_URL:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: METABASE_SITE_URL
-          #METABASE_JWT_SHARED_SECRET:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: METABASE_JWT_SHARED_SECRET
-          #METABASE_JWT_STATIC_EMBEDDING_SECRET:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: METABASE_JWT_STATIC_EMBEDDING_SECRET
-          #SCOUT_APM_KEY:
-          #  name: authorium-app-sidekiq-secrets
-          #  key: SCOUT_APM_KEY
           APRYSE_LICENSE_KEY:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: APRYSE_LICENSE_KEY
           PG_LOCKS_MONITOR_SLACK_WEBHOOK_URL:
-            name: authorium-app-sidekiq-secrets
+            name: appsidekiq-app-sidekiq-secrets
             key: PG_LOCKS_MONITOR_SLACK_WEBHOOK_URL
 
     service:
@@ -231,7 +210,7 @@ services:
               {
                 "name":"http-svc",
                 "prefix":"/",
-                "domain-aliases":["AUTHORIUM-APP"]
+                "domain-aliases":["appsidekiq-APP"]
               }
             ]
           }
@@ -243,7 +222,7 @@ services:
     deployment:
       replicas: 1
       image:
-        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/authorium-staging
+        repository: <account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/appsidekiq-staging
         #tag: "1.16.0-il5"
         tag: "1.14.3"
         pullPolicy: Always
@@ -253,4 +232,4 @@ services:
           cpu: "1024m"
           memory: "2048Mi"
       annotations: {}
-      ## Sidekiq uses the same config as authoriumapp
+      ## Sidekiq uses the same config as appsidekiq

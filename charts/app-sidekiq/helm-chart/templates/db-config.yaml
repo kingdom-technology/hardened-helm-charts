@@ -1,9 +1,9 @@
-{{- if .Values.services.authoriumapp.dbconfig }}
+{{- if .Values.services.app-sidekiq.dbconfig }}
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-config
-  namespace: authorium
+  namespace: appsidekiq
 spec:
   ttlSecondsAfterFinished: 600
   backoffLimit: 0
@@ -55,11 +55,11 @@ spec:
             echo "[pgaudit] Done."
         env:
           - name: DB_HOST
-            value: "rds391c760e-authorium-data-stg.cz2bq9mukrhe.us-gov-west-1.rds.amazonaws.com"
+            value: "rds391c760e-appsidekiq-data-stg.cz2bq9mukrhe.us-gov-west-1.rds.amazonaws.com"
           - name: DB_PORT
             value: "5432"
           - name: APP_DB_NAME
-            value: "authoriumstgdata"
+            value: "appsidekiqstgdata"
           - name: APP_DB_USER
             value: "postgres"
           - name: DB_ADMIN_USER
@@ -67,8 +67,8 @@ spec:
           - name: DB_ADMIN_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: authorium-app-sidekiq-secrets
-                key: AUTHORIUM_WEB_PASSWORD
+                name: appsidekiq-app-sidekiq-secrets
+                key: appsidekiq_WEB_PASSWORD
         volumeMounts:
           - name: redis-ca
             mountPath: /etc/ssl/
@@ -80,7 +80,7 @@ spec:
       volumes:
         - name: redis-ca
           secret:
-            secretName:  cert-authorium-app-redis-4
+            secretName:  cert-appsidekiq-app-redis-4
             items:
               - key: tls.crt
                 path: tls.crt

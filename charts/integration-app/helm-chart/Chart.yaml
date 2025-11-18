@@ -1,5 +1,0 @@
-apiVersion: v2
-name: etlworks-app
-description: Helm chart for deploying etlworks
-version: 0.1.97
-appVersion: "1.1.0"

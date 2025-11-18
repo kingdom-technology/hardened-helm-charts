@@ -1,5 +1,0 @@
-apiVersion: v2
-name: genai-embeddings-inference
-description: A Helm chart for deploying the GenAI embeddings inference service.
-version: 0.0.27
-appVersion: "0.1.4"

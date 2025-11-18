@@ -1,15 +1,15 @@
-{{- if .Values.services.authoriumapp.migrate }}
+{{- if .Values.services.appsidekiq.migrate }}
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-migrate-003
-  namespace: {{ .Values.services.authoriumapp.namespace }}
+  namespace: {{ .Values.services.appsidekiq.namespace }}
   labels:
     app: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ .Release.Name }}
     rubix-app: {{ .Chart.Name }}
-  {{- with .Values.services.authoriumapp.deployment.annotations }}
+  {{- with .Values.services.appsidekiq.deployment.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -47,16 +47,16 @@ spec:
       containers:
         - name: main
           workingDir: /rails
-          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.services.appsidekiq.deployment.image.repository }}:{{ .Values.services.appsidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/sh","-lc","bin/rails db:migrate --trace"]
           #command: ["/bin/sh","-lc","bin/rails db:prepare:with_data"]       
           env:
-            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            {{- range .Values.services.appsidekiq.deployment.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
-            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
@@ -74,7 +74,7 @@ spec:
       volumes:
         - name: redis-ca
           secret:
-            secretName:  cert-authorium-app-redis-4
+            secretName:  cert-appsidekiq-app-redis-4
             items:
               - key: tls.crt
                 path: tls.crt

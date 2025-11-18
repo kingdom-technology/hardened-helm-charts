@@ -1,15 +1,15 @@
-{{- if .Values.services.authoriumapp.initialuser }}
+{{- if .Values.services.appsidekiq.initialuser }}
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: initial-user-5
-  namespace: {{ .Values.services.authoriumapp.namespace }}
+  namespace: {{ .Values.services.appsidekiq.namespace }}
   labels:
     app: {{ .Release.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ .Release.Name }}
     rubix-app: {{ .Chart.Name }}
-  {{- with .Values.services.authoriumapp.deployment.annotations }}
+  {{- with .Values.services.appsidekiq.deployment.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -33,7 +33,7 @@ spec:
             "StackName": "{{ .Release.Namespace }}",
             "StackID": "{{ .Release.Namespace }}",
             "Containers": {
-              "authorium-app-sidekiq": {
+              "appsidekiq-app-sidekiq": {
                 "ProductName": "{{ .Chart.Name }}",
                 "ProductVersion": "{{ .Chart.AppVersion }}"
               }
@@ -78,16 +78,16 @@ spec:
       containers:
         - name: main
           workingDir: /rails
-          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.services.appsidekiq.deployment.image.repository }}:{{ .Values.services.appsidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/sh","-lc"]
           args:
             - |
               bin/rails r "
-                u = User.find_or_initialize_by(email: 'engineering@authorium.com')
-                u.first_name = 'Authorium'
+                u = User.find_or_initialize_by(email: 'engineering@appsidekiq.com')
+                u.first_name = 'appsidekiq'
                 u.last_name  = 'Engineering'
-                u.password   = ENV.fetch('AUTHORIUM_ADMIN_PASSWORD')
+                u.password   = ENV.fetch('appsidekiq_ADMIN_PASSWORD')
                 u.terms_of_service = true
                 u.admin = true
                 u.skip_default_organization = true if u.respond_to?(:skip_default_organization=)
@@ -99,11 +99,11 @@ spec:
                 puts 'Ensured admin user and org created'
               "
           env:
-            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            {{- range .Values.services.appsidekiq.deployment.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
-            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
@@ -125,7 +125,7 @@ spec:
       volumes:
         - name: redis-ca
           secret:
-            secretName:  cert-authorium-app-redis-4
+            secretName:  cert-appsidekiq-app-redis-4
             items:
               - key: tls.crt
                 path: tls.crt

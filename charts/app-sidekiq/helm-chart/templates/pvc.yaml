@@ -1,19 +1,19 @@
-{{- if .Values.services.authoriumapp.storage.persistence.enabled }}
+{{- if .Values.services.appsidekiq.storage.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-pvc
-  namespace: {{ .Values.services.authoriumapp.namespace }}
+  namespace: {{ .Values.services.appsidekiq.namespace }}
   labels:
     app: {{ .Release.Name }}
 spec:
   accessModes:
-    {{- range .Values.services.authoriumapp.storage.persistence.accessModes }}
+    {{- range .Values.services.appsidekiq.storage.persistence.accessModes }}
     - {{ . }}
     {{- end }}
   resources:
     requests:
-      storage: {{ .Values.services.authoriumapp.storage.persistence.size}}
-  storageClassName: {{ .Values.services.authoriumapp.storage.persistence.storageClassName }}
-  volumeMode: {{ .Values.services.authoriumapp.storage.persistence.volume }}
+      storage: {{ .Values.services.appsidekiq.storage.persistence.size}}
+  storageClassName: {{ .Values.services.appsidekiq.storage.persistence.storageClassName }}
+  volumeMode: {{ .Values.services.appsidekiq.storage.persistence.volume }}
 {{ end }}

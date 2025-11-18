@@ -1,7 +1,0 @@
-apiVersion: v2
-name: cke-docx
-description: CKEditor DOCX Converter On-Premises installation
-
-type: application
-version: 0.4.70
-appVersion: "1.22.2"

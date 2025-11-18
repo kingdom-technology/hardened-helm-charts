@@ -82,8 +82,8 @@ spec:
               app.kubernetes.io/instance: {{ .Release.Name }}
       initContainers:
         - name: ca-bundle
-          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
-          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ .Values.services.appsidekiq.deployment.image.repository }}:{{ .Values.services.appsidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.appsidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/bash","-lc"]
           args:
             - |
@@ -134,11 +134,11 @@ spec:
               subPath: ca.pem
               readOnly: true
           env:
-            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            {{- range .Values.services.appsidekiq.deployment.config.env }}
             - name: {{ .name }}
               value: "{{ .value }}"
             {{- end }}
-            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            {{- range $key, $value := .Values.services.appsidekiq.deployment.config.secrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
