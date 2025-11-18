@@ -38,25 +38,11 @@ else
 fi
 
 VALID_SERVICES=(
-  "authorium-app-sidekiq"
-  "authorium-docs-proxy"
-  "wave"
-  "clamav"
-  "cke-core"
-  "cke-docx"
-  "formio-enterprise"
-  "formio-pdf"
-  "genai-api"
-  "genai-embeddings-inference"
-  "genai-pdf-nlm-ingestor"
-  "spellchecker"
-  "spell-checker"
-  "etlworks-app"
-  "metabase"
-  "redis"
-  "mongodb"
-  "authorium-docs-proxy"
-  "smtp"
+  "app-sidekiq"
+  "genai-image"
+  "vendor-analytics"
+  "vendor-pdf-service"
+  "vendor-webspellchecker"
 )
 
 while getopts h:s:f:v flag; do
@@ -79,14 +65,16 @@ if [[ -z "$service" || -z "$helmchartversion" ]]; then
 fi
 
 export APOLLO_URL='https://caviar-usgc-2.palantirfedstart.com/'
+export AWS_ACCOUNT_ID=""
+export ORGANIZATION=""
 export HELM_USERNAME="AWS"
 export HELM_PASSWORD="$(aws ecr get-login-password --region us-gov-west-1)"
-export HELM_CHART_NAME="oci://070029289390.dkr.ecr.us-gov-west-1.amazonaws.com/helm/${service}"
-export MAVEN_COORDINATE="authorium:${service}:${helmchartversion}"
-export HELM_CHART_REPO_URL="oci://070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/helm/${service}"
+export HELM_CHART_NAME="oci://${AWS_ACCOUNT_ID}.dkr.ecr.us-gov-west-1.amazonaws.com/helm/${service}"
+export MAVEN_COORDINATE="${ORGANIZATION}:${service}:${helmchartversion}"
+export HELM_CHART_REPO_URL="oci://${AWS_ACCOUNT_ID}.dkr.ecr-fips.us-gov-west-1.amazonaws.com/helm/${service}"
 export HELM_CHART_VERSION="${helmchartversion}"
 export AWS_REGION=us-gov-west-1
-export SIGNING_PROFILE_ARN="arn:aws-us-gov:signer:us-gov-west-1:070029289390:/signing-profiles/authenticate_authorium"
+export SIGNING_PROFILE_ARN="arn:aws-us-gov:signer:us-gov-west-1:${AWS_ACCOUNT_ID}:/signing-profiles/authenticate_${ORGANIZATION}"
 
 # Path to the Chart.yaml file
 export chart_file="charts/${service}/helm-chart/Chart.yaml"
@@ -106,30 +94,21 @@ sed -i "s/^version: .*/version: ${helmchartversion}/" "$chart_file"
 # Create helm tar package
 helm package -d chart-packages/ charts/${service}/helm-chart/
 
-aws ecr get-login-password --region us-gov-west-1 | helm registry login   --username AWS   --password-stdin 070029289390.dkr.ecr.us-gov-west-1.amazonaws.com
+aws ecr get-login-password --region us-gov-west-1 | helm registry login   --username AWS   --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-gov-west-1.amazonaws.com
 
 # Push to AWS ECR
 helm push chart-packages/${service}-${helmchartversion}.tgz oci://${AWS_ACCOUNT_IDF}.dkr.ecr.us-gov-west-1.amazonaws.com/helm/
 
 # Sign And Verify Images
 case "$service" in
-  authorium-app-sidekiq)   readyservice="authoriumapp";; 
-  authorium-docs-proxy)    readyservice="authoriumDocsProxy";;
-  cke-core)           readyservice="ckecore";;
-  cke-docx)           readyservice="ckedocx";;
-  formio-enterprise) readyservice="formioenterprise";; 
-  formio-pdf)           readyservice="formiopdf";;
-  genai-api)            readyservice="genaiapi";;
-  genai-embeddings-inference) readyservice="genaiembeddings";;
-  genai-pdf-nlm-ingestor) readyservice="genaipdf";;
-  spell-checker)      readyservice="spellchecker";;
-  metabase)           readyservice="metabase";;
-  etlworks-app)       readyservice="etlworks";;
-  wave)               readyservice="wave";;
-  smtp)               readyservice="smtp";;
+  app-sidekiq)              readyservice="appsidekiq";; 
+  genai-image)              readyservice="genaiimage";;
+  vendor-analytics)         readyservice="analytics";;
+  vendor-pdf-server)        readyservice="formiopdf";;
+  vendor-webspellchecker)   readyservice="spellchecker";; 
   *) echo "Invalid service: $SERVICE"; exit 2 ;;
 esac
-#readyservice="${service//-/}"
+
 
 image_repo="$(yq -r "
   .services.${readyservice}.deployment.image.repository //
