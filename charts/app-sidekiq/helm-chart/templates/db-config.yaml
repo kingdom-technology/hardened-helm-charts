@@ -12,7 +12,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: psql
-        image: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/postgresql:16
+        image: ${AWS_ACCOUNT_ID}.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/postgresql:16
         command: ["/bin/bash","-lc"]
         args:
           - |
