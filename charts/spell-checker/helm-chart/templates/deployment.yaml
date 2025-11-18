@@ -1,0 +1,186 @@
+{{- if and .Values.services .Values.services.spellchecker .Values.services.spellchecker.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.spellchecker.namespace }}
+  labels:
+    app: spellchecker
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: spellchecker
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.spellchecker.deployment.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}  
+spec:
+  replicas: {{ .Values.services.spellchecker.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: spellchecker
+  template:
+    metadata:
+      labels:
+        app: spellchecker
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: spellchecker
+        app.kubernetes.io/component: server
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.pod/sls-service-info-v2: |
+          {
+            "ServiceName": "{{ .Release.Name }}",
+            "ServiceID": "{{ .Release.Namespace }}-{{ .Release.Name }}",
+            "StackName": "{{ .Release.Namespace }}",
+            "StackID": "{{ .Release.Namespace }}",
+            "Containers": {
+              "nginx": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              },
+              "webspellcheckerapi": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              }              
+            }
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: com.palantir.rubix/instance-group
+                    operator: In
+                    values:
+                      - fedstart
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: topology.kubernetes.io/zone
+              weight: 100
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/instance
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      containers:
+        - name: nginx
+          image: "{{ .Values.services.spellchecker.deployment_nginx.image.repository }}:{{ .Values.services.spellchecker.deployment_nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.services.spellchecker.deployment_nginx.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.spellchecker.deployment_nginx.containerPort }}
+              protocol: TCP
+              name: http-svc
+          volumeMounts:
+            - name: tls-secret-volume
+              mountPath: /etc/ssl/
+              readOnly: true
+            # - name: nginx-config-volume
+            #   mountPath: /etc/nginx/nginx.conf.template
+            #   subPath: nginx.conf              
+          env:
+            {{- range $key, $value := .Values.services.spellchecker.deployment_nginx.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.spellchecker.deployment_nginx.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.services.spellchecker.deployment_nginx.resources.requests.memory }}
+              cpu: {{ .Values.services.spellchecker.deployment_nginx.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.services.spellchecker.deployment_nginx.resources.limits.memory }}
+              cpu: {{ .Values.services.spellchecker.deployment_nginx.resources.limits.cpu }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault           
+
+        - name: webspellcheckerapi
+          image: "{{ .Values.services.spellchecker.deployment.image.repository }}:{{ .Values.services.spellchecker.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.spellchecker.deployment.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.spellchecker.deployment.containerPort }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "[[ $(ps -Af | grep AppServerX | grep -v grep | wc -l) -ge 2 ]]"
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+          env:
+            {{- range $key, $value := .Values.services.spellchecker.deployment.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.spellchecker.deployment.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}            
+          resources:
+            limits:
+              memory: {{ .Values.services.spellchecker.deployment.resources.limits.memory }}
+              cpu: {{ .Values.services.spellchecker.deployment.resources.limits.cpu }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 2000
+            runAsGroup: 2000
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: tls-secret-volume
+          secret:
+            secretName: cert-spell-checker
+        # - name: nginx-config-volume
+        #   configMap:
+        #     name: {{ .Release.Name }}-nginx-config
+        #     items:
+        #     - key: nginx.conf
+        #       path: nginx.conf            
+{{ end }}

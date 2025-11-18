@@ -1,0 +1,357 @@
+services:
+
+  etlworks:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "8080"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/etlworks-app"
+        tag: "1.1-2631"
+        pullPolicy: Always
+      containerPort: 8080
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          cpu: "2"
+          memory: "8Gi"
+      annotations: {}
+      config:
+        secrets:
+          #POSTGRES_HOST:
+          #  name: etlworks-app-secrets
+          #  key: ETLWORKS_HOST
+          POSTGRES_USERNAME:
+            name: etlworks-app-secrets
+            key: ETLWORKS_USERNAME
+          POSTGRES_PASSWORD:
+            name: etlworks-app-secrets
+            key: ETLWORKS_PASSWORD
+          REDIS_PASSWORD:
+            name: etlworks-redis
+            key: redis-password
+        env:
+        - name: POSTGRES_HOST
+          value: "rds391c760e-etl-data-stg-3p01.cz2bq9mukrhe.us-gov-west-1.rds.amazonaws.com"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: REDIS_HOST
+          value: "etlworks-redis-master.authorium.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: CUSTOM_PROPERTIES_PREFIX
+          value: "spring.redis.ssl=true\\nspring.redis.password="
+        - name: CUSTOM_PROPERTIES
+          value: "$(CUSTOM_PROPERTIES_PREFIX)$(REDIS_PASSWORD)"
+        - name: LICENSE_FILE
+          value: "4cc830a3-90df-4cb0-a829-7a3a7e15fa46.lic"
+        - name: JAVA_OPTS
+          value: "-Djavax.net.ssl.trustStore=/tmp/truststore.jks -Djavax.net.ssl.trustStorePassword=palantir"
+        # - name: PGOPTIONS
+        #   value: "--client-min-messages=debug1"
+      fileSystemId: "fs-0f53447384beb5128"
+      entrypointConfig: |
+        #!/bin/bash
+
+        echo "This entrypoint.sh script is sourced from a configMap..."
+        
+        if [ ! -d "$ETLWORKS_HOME/data/app-data" ] || [ ! -d "$ETLWORKS_HOME/data/apps" ] || [ ! -d "$ETLWORKS_HOME/data/drivers" ] || [ ! -d "$ETLWORKS_HOME/data/premium-drivers" ]; then
+                echo -e "[ENTRYPOINT] - Creating data directories"
+                mkdir -p $ETLWORKS_HOME/data/{app-data,apps,drivers,premium-drivers}
+                chown -R tomcat:tomcat $ETLWORKS_HOME/data
+        fi
+        
+        if [ ! -L "$CATALINA_HOME/webapps" ] || [ ! -d "$CATALINA_HOME/webapps" ] || [ ! -L "$CATALINA_HOME/drivers" ] || [ ! -d "$CATALINA_HOME/drivers" ] || [ ! -L "$CATALINA_HOME/premium-drivers" ] || [ ! -d "$CATALINA_HOME/premium-drivers" ]; then
+                echo -e "[ENTRYPOINT] - Creating symlinks"
+                rm -rf $CATALINA_HOME/webapps $CATALINA_HOME/drivers $CATALINA_HOME/premium-drivers
+                ln -s $ETLWORKS_HOME/data/apps $CATALINA_HOME/webapps
+                ln -s $ETLWORKS_HOME/data/drivers $CATALINA_HOME/drivers
+                ln -s $ETLWORKS_HOME/data/premium-drivers $CATALINA_HOME/premium-drivers
+        fi
+        
+        # Configure Redis endpoint
+        sed -i "s/^spring.redis.host=.*/spring.redis.host=${REDIS_HOST}/" $CATALINA_HOME/conf/application.properties
+        
+        # Set JWT secret
+        if [ ! -z "$JWT_SECRET" ]; then
+                echo -e "[ENTRYPOINT] - Setting JWT secret"
+                sed -i "s/^integrator.jwt.secret=.*/integrator.jwt.secret=${JWT_SECRET}/" $CATALINA_HOME/conf/application.properties
+                sed -i "s/^etl.framework.jwt.secret=.*/etl.framework.jwt.secret=${JWT_SECRET}/" $CATALINA_HOME/conf/application.properties
+        elif grep -qx 'integrator.jwt.secret=' $CATALINA_HOME/conf/application.properties; then
+                echo -e "[ENTRYPOINT] - Generating random JWT secret"
+                JWT_SECRET=$(date +%s | sha256sum | base64 | head -c 16 ; echo)
+                sed -i "s/^integrator.jwt.secret=.*/integrator.jwt.secret=${JWT_SECRET}/" $CATALINA_HOME/conf/application.properties
+                sed -i "s/^etl.framework.jwt.secret=.*/etl.framework.jwt.secret=${JWT_SECRET}/" $CATALINA_HOME/conf/application.properties
+        fi
+        
+        # Set custom properties
+        sed -i '1,/#custom properties/!d' $CATALINA_HOME/conf/application.properties
+        if [ ! -z "$CUSTOM_PROPERTIES" ]; then
+                echo -e "[ENTRYPOINT] - Setting custom properties"
+                echo "" >> $CATALINA_HOME/conf/application.properties
+                printf "$CUSTOM_PROPERTIES" >> $CATALINA_HOME/conf/application.properties
+        fi
+        
+        # Set Tomcat JMX flags
+        echo -e "[ENTRYPOINT] - Setting memory limits"
+        total_ram=$(free -m | awk '/Mem/ {print $2}')
+        ram=$(echo "scale=1;$total_ram*0.75" | bc)
+        ram_xmx="${ram%.*}"
+        if [ ! -z "$MAX_RAM" ]; then
+                ram_xmx=$MAX_RAM
+        fi
+        sed -i "s/^export JAVA_OPTS=.*/export JAVA_OPTS=\"\$JAVA_OPTS -Xms2g -Xmx${ram_xmx}m\"/" $CATALINA_HOME/bin/setenv.sh
+        
+        # Configure Postgres connection
+        echo -e "[ENTRYPOINT] - Setting Postgres connection properties"
+        sed -i "s~^url=.*~url=\"jdbc:postgresql://${POSTGRES_HOST}:5432/integrator\"~" $CATALINA_HOME/conf/context.xml
+        sed -i "s/^username=.*/username=\"${POSTGRES_USER}\"/" $CATALINA_HOME/conf/context.xml
+        sed -i "s/^password=.*/password=\"${POSTGRES_PASSWORD}\"/" $CATALINA_HOME/conf/context.xml
+        
+        # Validate database connection
+        echo "[DEBUG] - Connecting using: postgresql://${POSTGRES_USER}:*****@${POSTGRES_HOST}:5432/postgres"
+        echo "[ENTRYPOINT] - Validating connection to Postgres..."
+        # cat $CATALINA_HOME/conf/context.xml
+        echo "[ENTRYPOINT] - listing all databases..."
+        psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432" -l --set=VERBOSITY=verbose
+        # psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/postgres" -c '\q' --echo-all --set VERBOSITY=verbose
+
+        # if [ $? -ne 0 ]; then
+        #     echo "[ERROR] - Unable to connect to Postgres at ${POSTGRES_HOST}, here's the context.xml"
+        #     cat $CATALINA_HOME/conf/context.xml
+        #     exit 1
+        # fi
+        
+        # Create Postgres DB if not exists
+        db_found=$(psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432" -l | grep integrator)
+        if [ -z "$db_found" ]; then
+                echo -e "[ENTRYPOINT] - Creating Postgres database"
+                psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432" -c 'CREATE DATABASE integrator'
+        fi
+        
+        # Copy license to expected destination
+        if [ ! "$(ls -A $ETLWORKS_HOME/data/*.lic)" ]; then
+                echo -e "[ENTRYPOINT] - ERROR: No license file found in /opt/etlworks/license"
+                exit 1
+        else
+                echo -e "[ENTRYPOINT] - SUCCESS: License found in /opt/etlworks/license"
+                cp $ETLWORKS_HOME/data/*.lic $CATALINA_HOME/conf
+        fi
+        
+        echo -e "[ENTRYPOINT] - cleaning up"
+        rm -fr /opt/etlworks/data/apps/*.war /opt/etlworks/data/drivers/*.jar
+        ls /opt/etlworks/data
+
+        # Check application installed
+        app_count=`ls -1 $ETLWORKS_HOME/data/apps/*.war 2>/dev/null | wc -l`
+        echo "app_count is $app_count"
+        drivers_count=`ls -1 $ETLWORKS_HOME/data/drivers/*.jar 2>/dev/null | wc -l`
+        echo "drivers_count is $drivers_count"
+        if [ $app_count = 0 ] || [ $drivers_count = 0 ]; then
+                echo -e "[ENTRYPOINT] - Executing download.sh"
+                $ETLWORKS_HOME/download.sh
+        fi
+
+        echo -e "[ENTRYPOINT] - Troubleshooting why download.sh is not running"
+        echo "contents of $ETLWORKS_HOME"
+        ls -laR $ETLWORKS_HOME
+        echo "contents of $CATALINA_HOME"
+        ls -laR $CATALINA_HOME
+        
+        # echo "contents of $ETLWORKS_HOME/download.sh"
+        # cat $ETLWORKS_HOME/download.sh
+
+      downloadConfig: |
+        #!/bin/bash
+        
+        echo -e "[ENTRYPOINT] - This download.sh script is sourced from a configMap..."
+
+        RED="\e[31m"
+        YELLOW="\e[33m"
+        GREEN="\e[32m"
+        RESET="\e[0m"
+        
+        
+        echo -e "[ENTRYPOINT] - ${YELLOW}Checking cacerts${RESET}"
+        find /usr/lib/jvm -name cacerts
+        
+        # echo -e "[ENTRYPOINT] - ${YELLOW}Checking env vars${RESET}"
+        # env
+        
+        echo -e "[ENTRYPOINT] - ${YELLOW}Downloading new artifacts from etlworks${RESET}"
+        java -Djavax.net.debug=ssl,handshake -Djava.net.debug=all -Djavax.net.ssl.trustStore=/tmp/truststore.jks -Djavax.net.ssl.trustStorePassword=palantir -jar $ETLWORKS_HOME/etlworks-cli.jar download -t lib -o /tmp/lib_artifacts.tar.gz -c $CATALINA_HOME
+        # java -Djavax.net.debug=ssl,handshake -Djava.net.debug=all -jar $ETLWORKS_HOME/etlworks-cli.jar download -t lib -o /tmp/lib_artifacts.tar.gz -c $CATALINA_HOME
+        if [[ ! -f /tmp/lib_artifacts.tar.gz ]]; then
+                echo -e "[ENTRYPOINT] - ${RED}ERROR${RESET}: failed to download artifacts #1"
+                exit 1
+        fi
+        java -Djavax.net.debug=ssl,handshake -Djava.net.debug=all -Djavax.net.ssl.trustStore=/tmp/truststore.jks -Djavax.net.ssl.trustStorePassword=palantir -jar $ETLWORKS_HOME/etlworks-cli.jar download -t app -o /tmp/webapps_artifacts.tar.gz -c $CATALINA_HOME
+        # java -jar $ETLWORKS_HOME/etlworks-cli.jar download -t app -o /tmp/webapps_artifacts.tar.gz -c $CATALINA_HOME
+        if [[ ! -f /tmp/webapps_artifacts.tar.gz ]]; then
+                echo -e "[ENTRYPOINT] - ${RED}ERROR${RESET}: failed to download artifacts #2"
+                exit 1
+        fi
+        
+        echo -e "[ENTRYPOINT] - ${YELLOW}Installing artifacts${RESET}"
+
+        # echo "Checking files in /tmp dir"
+        # ls -la /tmp
+        # ls -la /opt/etlworks/
+        # ls -la /opt/etlworks/data/
+        # ls -la /opt/etlworks/data/drivers/
+        # ls -la /opt/etlworks/data/apps/
+        
+        rm -rf $ETLWORKS_HOME/data/drivers/*
+        tar -xzf /tmp/lib_artifacts.tar.gz -C $ETLWORKS_HOME/data/drivers/
+        chown -R tomcat:tomcat $ETLWORKS_HOME/data/drivers
+        rm -rf /tmp/lib_artifacts.tar.gz
+        
+        rm -rf $ETLWORKS_HOME/data/apps/*
+        tar -xzf /tmp/webapps_artifacts.tar.gz -C $ETLWORKS_HOME/data/apps/
+        chown -R tomcat:tomcat $ETLWORKS_HOME/data/apps
+        rm -rf /tmp/webapps_artifacts.tar.gz
+        
+        echo -e "[ENTRYPOINT] - ${GREEN}New artifacts installed${RESET}"
+
+      init:
+        config:
+          secrets:
+            #POSTGRES_HOST:
+            #  name: etlworks-app-secrets
+            #  key: ETLWORKS_HOST
+            POSTGRES_USERNAME:
+              name: etlworks-app-secrets
+              key: ETLWORKS_USERNAME
+            POSTGRES_PASSWORD:
+              name: etlworks-app-secrets
+              key: ETLWORKS_PASSWORD
+            REDIS_PASSWORD:
+              name: etlworks-app-secrets
+              key: redis-password
+          env:
+          - name: LICENSE_FILE
+            value: "4cc830a3-90df-4cb0-a829-7a3a7e15fa46.lic"
+          - name: UPGRADE # Set to "True" when you need to Upgrade Etlworks (https://hub.docker.com/r/etlworks/etlworks-app)
+            value: "false"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              
+              echo -e "[ENTRYPOINT] - ${YELLOW}Start of redis connectivity testing${RESET}"
+              openssl s_client -connect etlworks-redis-master.authorium.svc.cluster.local:6379 -CAfile /usr/local/share/ca-certificates/fed-ca.pem
+              echo -e "[ENTRYPOINT] - ${GREEN}End of redis connectivity testing${RESET}"
+
+              ls -laR /opt/etlworks/data/
+              
+              if [ "${UPGRADE}" = "true" ]; then
+                echo "UPGRADE is set to true, deleting cached data to prepare.";
+                rm -fr /opt/etlworks/data/apps /opt/etlworks/data/drivers && ls /opt/etlworks/data;
+              else
+                echo "UPGRADE is not set to true, starting with cached data.";
+              fi
+              cp /tmp/${LICENSE_FILE} /opt/etlworks/data/ && ls /opt/etlworks/data
+
+    storage:
+      storageClass: restricted.fedstart-staging-fxtn.efs-v0
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[{
+                  "name":"http-svc",
+                  "prefix":"/",
+                  "domain-aliases":["ETLWORKS"]
+              }]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+    #service:
+    #  type: ClusterIP
+    #  port: 443  
+    #  annotations:
+    #    com.palantir.rubix.service.spp/v3: >
+    #      {
+    #          "endpoints":[
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/etlworks",
+    #              "rewrite-prefix":"/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/rest/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/img/",
+    #              "domain-aliases":["DEFAULT"]
+    #            }
+    #          ]
+    #      }
+    #    com.palantir.rubix.service/pod-cert: '{}'
+
+    # The Original 
+    #service:
+    #  type: ClusterIP
+    #  port: 443  
+    #  annotations:
+    #    com.palantir.rubix.service.spp/v3: >
+    #      {
+    #          "endpoints":[
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/etlworks",
+    #              "rewrite-prefix":"/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/assets/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/rest/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/img/",
+    #              "domain-aliases":["DEFAULT"]
+    #            }
+    #          ]
+    #      }
+    #    com.palantir.rubix.service/pod-cert: '{}'

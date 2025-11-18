@@ -1,0 +1,30 @@
+{{- if and .Values.services .Values.services.metabase .Values.services.metabase.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.metabase.namespace }}
+  labels:
+    app: metabase
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: metabase
+    app.kubernetes.io/component: server
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.metabase.service.annotations }}    
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec: 
+  type: {{ .Values.services.metabase.service.type | default "ClusterIP" }}
+  {{- if eq .Values.services.metabase.service.type "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.metabase.service.loadBalancerClass }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: metabase
+  ports:
+    - name: http-svc
+      port: {{ .Values.services.metabase.service.port }}
+      targetPort: {{ .Values.services.metabase.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}

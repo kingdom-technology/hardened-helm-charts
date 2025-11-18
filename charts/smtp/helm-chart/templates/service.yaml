@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: smtp-sink
+  namespace: authorium
+spec:
+  selector:
+    app: smtp-sink
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: 25
+  type: ClusterIP

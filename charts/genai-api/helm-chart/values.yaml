@@ -1,0 +1,118 @@
+services:
+
+  genaiapi: 
+    create: true
+      
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "8000"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "https"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/docshunter-genai-ai-api
+        ##digest: "sha256:6a02d516d02c8cf70793a7dff256f67301973c0fca37a65475a4ebe2ac3db5f7"
+        tag: "0.1.5"
+        ##tag: "0.1.5"        
+        pullPolicy: Always
+      containerPort: 8000
+      resources:
+        limits:
+          cpu: "2048m"
+          memory: "4096Mi"
+      annotations: {} 
+      config:
+        env:
+        - name: PDF_TO_MD_URL
+          value: "https://ai-pdf-nml-ingest-authorium-stg-01.secure.authorium.com/api/parseDocument?renderFormat=all&useNewIndentParser=true"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        - name: AWS_ROLE_ARN
+          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-mission-manager-bedrock-default-role-bb70d24b"
+        - name: APP_ENV
+          value: staging
+        - name: EXTRACT_DOCUMENT_NAME
+          value: "false"
+        - name: LLM_HOSTING
+          value: BEDROCK
+        - name: INFER_PROMPT_TYPE
+          value: "false"
+        - name: BEDROCK_REGION
+          value: us-gov-west-1
+        - name: RE_RANKER_MODEL
+          value: rerank-english-v3.0
+        - name: LLM_ASK_TEMPERATURE
+          value: 0.1
+        - name: PROMPT_TYPE
+          value: TEXT_GENERATION
+        - name: EMBEDDINGS_API_URL
+          value: https://ai-embed-inf-authorium-stg-01.secure.authorium.com/embed
+        - name: LLM_MODEL_ID
+          value: anthropic.claude-3-5-sonnet-20240620-v1:0
+        - name: APP_PORT
+          value: 8000
+        - name: LLM_MODEL
+          value: CLAUDE
+        - name: AWS_S3_EXTERNAL_ENDPOINT_URL
+          value: https://s3.us-gov-west-1.amazonaws.com
+        secrets:
+          SYSTEM_ORGANIZATION_ID:
+            name: genai-api-secrets
+            key: SYSTEM_ORGANIZATION_ID
+          COHERE_API_KEY:
+            name: genai-api-secrets
+            key: COHERE_API_KEY
+          DATABASE_URL:
+            name: genai-api-secrets
+            key: DATABASE_URL
+          JWT_SECRET:
+            name: genai-api-secrets
+            key: JWT_SECRET
+          AUTHORIZED_API_KEY:
+            name: genai-api-secrets
+            key: AUTHORIZED_API_KEY
+          OPENAI_API_KEY:
+            name: genai-api-secrets
+            key: OPENAI_API_KEY
+          AWS_S3_DOCUMENTS_BUCKET_NAME:
+            name: genai-api-secrets
+            key: AI_S3_BUCKET_NAME
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        # com.palantir.rubix.service.spp/v3: >
+        #        {
+        #            "endpoints":[{
+        #                "name":"http-svc",
+        #                "prefix":"/genai-api",
+        #                "prefix-rewrite":"/", 
+        #                "domain-aliases":["DEFAULT"]
+        #            }]
+        #        }
+           # This creates a secret called 'cert-<svc-name>' which is needed for frontdoor ingress
+        com.palantir.rubix.service/pod-cert: '{}'

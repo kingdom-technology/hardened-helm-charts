@@ -1,0 +1,70 @@
+services:
+
+  spellchecker:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "8080"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/spellcheck"
+        tag: "6.7.0.0-202511.2755"
+        pullPolicy: Always
+      containerPort: 8080
+      resources:
+        limits:
+          cpu: "2048m"
+          memory: "5120Mi"
+      annotations: {}
+      config:
+        env:
+        - name: WPR_PROTOCOL
+          value: "2"
+        - name: WPR_DOMAIN_NAME
+          value: authorium-spellcheck-stg.palantirfedstart.com
+        - name: WPR_WEB_PORT
+          value: "443"
+        #secrets:
+        #  WPR_LICENSE_TICKET_ID:
+        #    name: spell-checker-secrets
+        #    key: WPR_LICENSE_TICKET_ID
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[{
+                  "name":"http-svc",
+                  "prefix":"/",
+                  "domain-aliases":["SPELL-CHECK"]
+              }]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'

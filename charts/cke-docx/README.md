@@ -1,0 +1,1 @@
+helm install -n duploservices-stg-3p01 docx cke-docx/ckeditor-docx -f values.yaml

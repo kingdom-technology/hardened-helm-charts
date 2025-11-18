@@ -1,0 +1,139 @@
+{{- if .Values.services.wave.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-wave
+  namespace: {{ .Values.services.wave.namespace }}
+  labels:
+    app: wave
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: wave
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.wave.deployment.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}  
+spec:
+  replicas: {{ .Values.services.wave.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: wave
+  template:
+    metadata:
+      labels:
+        app: wave
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: wave
+        app.kubernetes.io/component: server
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.pod/sls-service-info-v2: |
+          {
+            "ServiceName": "{{ .Release.Name }}",
+            "ServiceID": "{{ .Release.Namespace }}-{{ .Release.Name }}",
+            "StackName": "{{ .Release.Namespace }}",
+            "StackID": "{{ .Release.Namespace }}",
+            "Containers": {
+              "container-name": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              }
+            }
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: com.palantir.rubix/instance-group
+                    operator: In
+                    values:
+                      - fedstart
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: topology.kubernetes.io/zone
+              weight: 100
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/instance
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}              
+      containers:
+        - name: wave
+          image: "{{ .Values.services.wave.deployment.image.repository }}:{{ .Values.services.wave.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.wave.deployment.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.wave.deployment.containerPort }}
+              protocol: TCP
+              name: http-svc
+          volumeMounts:
+            - name: tls-secret-volume
+              mountPath: /etc/ssl/
+              readOnly: true
+          env:
+            {{- range $key, $value := .Values.services.wave.deployment.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.wave.deployment.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}                       
+          resources:
+            limits:
+              memory: {{ .Values.services.wave.deployment.resources.limits.memory }}
+              cpu: {{ .Values.services.wave.deployment.resources.limits.cpu }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - curl -k -f https://localhost:9443/user.config.json || exit 1
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+          stdin: false
+          tty: false
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: tls-secret-volume
+          secret:
+            secretName: cert-wave-wave-svc
+{{ end }}

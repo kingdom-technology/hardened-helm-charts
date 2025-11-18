@@ -1,0 +1,97 @@
+{{- if .Values.services.authoriumapp.dbconfig }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-config
+  namespace: authorium
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: psql
+        image: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/postgresql:16
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            set -euo pipefail
+
+            PSQL=/opt/bitnami/postgresql/bin/psql
+
+            # Build one libpq connection string and reuse it everywhere (+ explicit CA)
+            export PSQL_BASE="host=${DB_HOST} port=${DB_PORT} dbname=postgres user=${DB_ADMIN_USER} password=${DB_ADMIN_PASSWORD} sslmode=require sslrootcert=/usr/local/share/ca-certificates/fed-ca.pem"
+
+            echo "[pgaudit] Waiting for ${DB_HOST}:${DB_PORT}..."
+            for i in $(seq 1 40); do
+              if timeout 3 bash -c "</dev/tcp/${DB_HOST}/${DB_PORT}" 2>/dev/null; then break; fi
+              echo "  still waiting ($i/40)"; sleep 5
+            done
+
+            echo "[pgaudit] Ensure app DB '${APP_DB_NAME}' exists..."
+            if ! "$PSQL" -At -d "$PSQL_BASE" -c "SELECT 1 FROM pg_database WHERE datname='${APP_DB_NAME}'" | grep -q '^1$'; then
+              echo "  creating DB '${APP_DB_NAME}' owned by '${APP_DB_USER}'"
+              "$PSQL" -v ON_ERROR_STOP=1 -d "$PSQL_BASE" -c "CREATE DATABASE ${APP_DB_NAME} OWNER ${APP_DB_USER};"
+            else
+              echo "  DB '${APP_DB_NAME}' already exists."
+            fi
+
+            enable_and_verify () {
+              local dbname="$1"
+              local conn="host=${DB_HOST} port=${DB_PORT} dbname=${dbname} user=${DB_ADMIN_USER} password=${DB_ADMIN_PASSWORD} sslmode=require sslrootcert=/usr/local/share/ca-certificates/fed-ca.pem"
+
+              echo "[pgaudit] Enabling pgaudit on '${dbname}' (idempotent)..."
+              "$PSQL" -v ON_ERROR_STOP=1 -d "$conn" -c "CREATE EXTENSION IF NOT EXISTS pgaudit;"
+
+              echo "[pgaudit] Verifying on '${dbname}'..."
+              "$PSQL" -At -d "$conn" -c "select name || ' ' || coalesce(installed_version,'(not installed)') from pg_available_extensions where lower(name)='pgaudit';"
+            }
+
+            # Enable on 'postgres' and on the app DB
+            enable_and_verify "postgres"
+            enable_and_verify "${APP_DB_NAME}"
+
+            echo "[pgaudit] Done."
+        env:
+          - name: DB_HOST
+            value: "rds391c760e-authorium-data-stg.cz2bq9mukrhe.us-gov-west-1.rds.amazonaws.com"
+          - name: DB_PORT
+            value: "5432"
+          - name: APP_DB_NAME
+            value: "authoriumstgdata"
+          - name: APP_DB_USER
+            value: "postgres"
+          - name: DB_ADMIN_USER
+            value: "postgres"
+          - name: DB_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: authorium-app-sidekiq-secrets
+                key: AUTHORIUM_WEB_PASSWORD
+        volumeMounts:
+          - name: redis-ca
+            mountPath: /etc/ssl/
+            readOnly: true
+          - name: external-ca-bundle
+            mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+            subPath: ca.pem
+            readOnly: true    
+      volumes:
+        - name: redis-ca
+          secret:
+            secretName:  cert-authorium-app-redis-4
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+        - name: external-ca-bundle
+          configMap:
+            name: tls-external-ca-bundle
+            items:
+              - key: ca.pem
+                path: ca.pem
+{{- end }}

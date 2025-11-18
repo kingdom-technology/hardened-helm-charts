@@ -1,0 +1,23 @@
+{{- if .Values.services.formiopdf.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.formiopdf.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+  {{- with .Values.services.formiopdf.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.services.formiopdf.service.type }}
+  loadBalancerClass: {{ .Values.services.formiopdf.service.loadBalancerClass }}
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - name: http-svc
+      port: {{ .Values.services.formiopdf.service.port }}
+      targetPort: {{ .Values.services.formiopdf.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}

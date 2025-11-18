@@ -1,0 +1,16 @@
+# {{- if .Values.services.etlworks.create }}
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: {{ .Release.Name }}-pv
+#   namespace: {{ .Values.services.etlworks.namespace }}
+#   labels:
+#     app: etlworks
+# spec:
+#   capacity:
+#     storage: 10Gi
+#   volumeMode: Filesystem
+#   accessModes:
+#     - ReadWriteMany
+#   persistentVolumeReclaimPolicy: Retain
+# {{ end }}

@@ -1,0 +1,23 @@
+{{- if .Values.services.genaiapi.create }}
+apiVersion: v1
+kind: Service
+metadata: 
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.genaiapi.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+  {{- with .Values.services.genaiapi.service.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec: 
+  type: {{ .Values.services.genaiapi.service.type }}
+  loadBalancerClass: {{ .Values.services.genaiapi.service.loadBalancerClass }}
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - name: http-svc
+      port: {{ .Values.services.genaiapi.service.port }}
+      targetPort: {{ .Values.services.genaiapi.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}

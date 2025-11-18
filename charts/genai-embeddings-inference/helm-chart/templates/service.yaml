@@ -1,0 +1,27 @@
+{{- if .Values.services.genaiembeddings.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.genaiembeddings.namespace }}
+  labels:
+    app: genai-embeddings
+  {{- with .Values.services.genaiembeddings.service.annotations }}    
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.services.genaiembeddings.service.type | default "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.genaiembeddings.service.loadBalancerClass }}  
+  selector:
+    app: genai-embeddings
+spec:
+  type: {{ .Values.services.genaiembeddings.service.type }}
+  loadBalancerClass: {{ .Values.services.genaiembeddings.service.loadBalancerClass }}  
+  selector:
+    app: genai-embeddings
+  ports:
+    - port: {{ .Values.services.genaiembeddings.service.port }}
+      targetPort: {{ .Values.services.genaiembeddings.deployment.containerPort }}
+      protocol: TCP
+{{ end }}

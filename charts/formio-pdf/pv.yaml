@@ -1,0 +1,19 @@
+{{- if .Values.services.formiopdf.create }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-formiopdf-pv
+  namespace: {{ .Values.services.formiopdf.namespace }}
+  labels:
+    app: formio-pdf-server
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: {{ .Values.services.formiopdf.storage.efsid }}
+{{ end }}

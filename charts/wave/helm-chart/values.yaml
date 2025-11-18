@@ -1,0 +1,69 @@
+services:
+
+  wave:
+    create: true
+      
+    #nodeSelector:
+    #  tenantname: duploservices-stg-3p01
+    namespace: authorium
+
+    #deployment_nginx:
+    #  image:
+    #    repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+    #    tag: "1.27.4-1-202505.1983"
+    #    pullPolicy: Always
+    #  containerPort: 9443
+    #  resources:
+    #    requests:
+    #      cpu: "1"
+    #      memory: "1Gi"
+    #    limits:
+    #      cpu: "1"
+    #      memory: "1Gi"
+    #  annotations: {}
+    #  config:
+    #    env:
+    #    - name: APP_PORT
+    #      value: "443"
+    #    - name: NGINX_PORT
+    #      value: "9443"
+    #    - name: APP_PROTOCOL
+    #      value: "https"
+    #    - name: SSL_CERT
+    #      value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/highsec-wave
+        tag: "2024-3-202509.2548"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+      annotations: {}
+      config:
+        secrets: [] 
+        env:
+          - name: SSL_CERT
+            value: tls
+
+    service:
+      type: ClusterIP
+      ##loadBalancerClass: service.k8s.aws/nlb
+      port: 443  
+      annotations:
+      #   com.palantir.rubix.service.spp/v3: >
+      #     {
+      #         "endpoints":[{
+      #             "name":"http-svc",
+      #             "prefix":"/wave",
+      #             "rewrite-prefix":"/user.config.json", 
+      #             "domain-aliases":["DEFAULT"]
+      #         }]
+      #     }
+        com.palantir.rubix.service/pod-cert: '{}'
+   
+

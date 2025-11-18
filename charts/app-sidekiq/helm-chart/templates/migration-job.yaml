@@ -1,0 +1,91 @@
+{{- if .Values.services.authoriumapp.migrate }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate-003
+  namespace: {{ .Values.services.authoriumapp.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.authoriumapp.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/component: migrate
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.service/pod-cert: '{}'
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: com.palantir.rubix/instance-group
+                    operator: In
+                    values: [fedstart]
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      containers:
+        - name: main
+          workingDir: /rails
+          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          command: ["/bin/sh","-lc","bin/rails db:migrate --trace"]
+          #command: ["/bin/sh","-lc","bin/rails db:prepare:with_data"]       
+          env:
+            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+          volumeMounts:
+            - name: redis-ca
+              mountPath: /etc/ssl/
+              readOnly: true
+            - name: external-ca-bundle
+              mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+              subPath: ca.pem
+              readOnly: true    
+      volumes:
+        - name: redis-ca
+          secret:
+            secretName:  cert-authorium-app-redis-4
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+        - name: external-ca-bundle
+          configMap:
+            name: tls-external-ca-bundle
+            items:
+              - key: ca.pem
+                path: ca.pem  
+{{- end }}

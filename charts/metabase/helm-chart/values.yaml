@@ -1,0 +1,83 @@
+services:
+
+  metabase:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "3000"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/metabase"
+        tag: "v1.55.18.1-202510.2583"
+        pullPolicy: Always
+      containerPort: 3000
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          cpu: "2"
+          memory: "8Gi"
+      annotations: {}
+      config:
+        secrets:
+          MB_DB_HOST:
+            name: metabase-secrets
+            key: ETLWORKS_HOST
+          MB_DB_USER:
+            name: metabase-secrets
+            key: ETLWORKS_USERNAME
+          MB_DB_PASS:
+            name: metabase-secrets
+            key: ETLWORKS_PASSWORD
+          MB_PREMIUM_EMBEDDING_TOKEN:
+            name: metabase-secrets
+            key: TOKEN
+        env:
+        - name: MB_DB_TYPE
+          value: "postgres"
+        - name: MB_DB_DBNAME
+          value: "etldatastg3p01"
+        - name: MB_DB_PORT
+          value: "5432"
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[{
+                  "name":"http-svc",
+                  "prefix":"/",
+                  "domain-aliases":["METABASE"]
+              }]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'

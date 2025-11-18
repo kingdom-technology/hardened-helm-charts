@@ -1,0 +1,366 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorium-app
+  namespace: duploservices-stg-01  
+  labels:
+    app: authorium-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authorium-app
+  template:
+    metadata:
+      labels:
+        app: authorium-app
+    spec:
+      nodeSelector:
+        tenantname: duploservices-stg-01
+      containers:
+        - name: authorium-app
+          image: 070029289390.dkr.ecr.us-gov-west-1.amazonaws.com/authorium-staging:latest
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          env:
+            - name: AWS_S3_REGION
+              value: "us-gov-west-1"
+            - name: HOST
+              value: "app.staging.authorium.com"
+            - name: AWS_REGION
+              value: "us-gov-west-1"
+            - name: RAILS_ENV
+              value: "staging"
+            - name: DATABASE_NAME
+              value: "duploauthorium-web-staging"
+            - name: FORMIO_STAGE_ID
+              value: "staging"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: REDIS_URL
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_S3_BUCKET_NAME
+            - name: DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_HOST
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_USERNAME
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_PASSWORD
+            - name: RAILS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: RAILS_MASTER_KEY
+            - name: FORMIO_ADMIN_ROLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_ADMIN_ROLE_ID
+            - name: FORMIO_JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: formio-secrets
+                  key: FORMIO_JWT_SECRET_KEY
+            - name: FORMIO_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_PROJECT_ID
+            - name: FORMIO_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_BASE_URL
+            - name: CKEDITOR_ENV_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_ENV_ID
+            - name: CKEDITOR_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_SECRET_KEY
+            - name: CKEDITOR_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_API_SECRET
+            - name: CKEDITOR_EXPORT_DOCX_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_EXPORT_DOCX_SECRET_KEY
+            - name: CKEDITOR_EXPORT_DOCX_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_EXPORT_DOCX_BASE_URL
+            - name: CKEDITOR_DOCX_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_DOCX_API_VERSION
+          resources:
+            requests:
+              cpu: "2048m"
+              memory: "4096Mi"
+            limits:
+              cpu: "2048m"
+              memory: "4096Mi"
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: 3000
+          #     scheme: HTTP # Use HTTP for unencrypted access
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 20
+          #   timeoutSeconds: 10
+          #   failureThreshold: 10
+          volumeMounts:
+            - name: aws-logs
+              mountPath: /var/log/containers
+      volumes:
+        - name: aws-logs
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorium-app-service
+  namespace: duploservices-stg-01
+  labels:
+    app: authorium-app
+  # annotations:
+  #   service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+  #   service.beta.kubernetes.io/aws-load-balancer-type: external
+  #   service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-0a9ec94cc252b8fb6, subnet-075595d96c3375cae
+  #   external-dns.alpha.kubernetes.io/hostname: app.staging.authorium.com
+  #   service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "false"
+  #   ##service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  #   service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-0bf3248f559608753"
+  #   service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws-us-gov:acm:us-gov-west-1:070029289390:certificate/2aa89c09-8e0e-482b-be7c-a737e301aaa6"
+  #   service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+  #   service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+  #   service.beta.kubernetes.io/aws-load-balancer-alpn-policy: HTTP2Preferred
+spec:
+  # type: LoadBalancer
+  type: ClusterIP
+  # loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: authorium-app
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "authorium-app-ingress"
+  namespace: "duploservices-stg-01"
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/subnets: subnet-00507881a9d442a00, subnet-0c4b81b03e65a4ebf
+    alb.ingress.kubernetes.io/security-groups: sg-04c66e7853b9e20da, sg-0351eae81357ada14, sg-05d14a3244fbd7d71
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws-us-gov:acm:us-gov-west-1:070029289390:certificate/2aa89c09-8e0e-482b-be7c-a737e301aaa6
+    alb.ingress.kubernetes.io/success-codes: 200-399
+# spec:
+#   labels:
+#     app: authorium-app
+spec:
+  ingressClassName: alb
+  rules:
+    - host: app.staging.authorium.com
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: "authorium-app-service"
+                port:
+                  number: 3000
+
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorium-sidekiq
+  namespace: duploservices-stg-01  
+  labels:
+    app: authorium-sidekiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authorium-sidekiq
+  template:
+    metadata:
+      labels:
+        app: authorium-sidekiq
+    spec:
+      nodeSelector:
+        tenantname: duploservices-stg-01
+      containers:
+        - name: sidekiq
+          image: 070029289390.dkr.ecr.us-gov-west-1.amazonaws.com/authorium-staging:latest
+          command: ["bundle", "exec", "sidekiq"]
+          ports:
+            - containerPort: 3000
+          env:
+            - name: AWS_S3_REGION
+              value: "us-gov-west-1"
+            - name: HOST
+              value: "app.staging.authorium.com"
+            - name: AWS_REGION
+              value: "us-gov-west-1"
+            - name: RAILS_ENV
+              value: "staging"
+            - name: DATABASE_NAME
+              value: "duploauthorium-web-staging"
+            - name: FORMIO_STAGE_ID
+              value: "staging"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: REDIS_URL
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_S3_BUCKET_NAME
+            - name: DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_HOST
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_USERNAME
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: AUTHORIUM_WEB_PASSWORD
+            - name: RAILS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: RAILS_MASTER_KEY
+            - name: FORMIO_ADMIN_ROLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_ADMIN_ROLE_ID
+            - name: FORMIO_JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_JWT_SECRET_KEY
+            - name: FORMIO_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_PROJECT_ID
+            - name: FORMIO_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: FORMIO_BASE_URL
+            - name: CKEDITOR_ENV_ID
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_ENV_ID
+            - name: CKEDITOR_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_SECRET_KEY
+            - name: CKEDITOR_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_API_SECRET   
+
+            - name: CKEDITOR_EXPORT_DOCX_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_EXPORT_DOCX_SECRET_KEY
+            - name: CKEDITOR_EXPORT_DOCX_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_EXPORT_DOCX_BASE_URL
+            - name: CKEDITOR_DOCX_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: authorium-secrets
+                  key: CKEDITOR_DOCX_API_VERSION   
+          resources:
+            requests:
+              cpu: "1024m"
+              memory: "2048Mi"
+            limits:
+              cpu: "1024m"
+              memory: "2048Mi"
+          volumeMounts:
+            - name: aws-logs
+              mountPath: /var/log/containers
+      volumes:
+        - name: aws-logs
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorium-sidekiq-service
+  namespace: duploservices-stg-01
+  labels:
+    app: authorium-sidekiq
+  # annotations:
+  #   service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+  #   service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-0a9ec94cc252b8fb6, subnet-075595d96c3375cae
+  #   external-dns.alpha.kubernetes.io/hostname: authorium-app-eks.authorium.com
+  #   service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "false"
+  #   service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  #   service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-0bf3248f559608753"
+  #   service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws-us-gov:acm:us-gov-west-1:070029289390:certificate/33353efb-210b-4a9b-80c4-7df5a5eca554"
+  #   service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+  #   service.beta.kubernetes.io/aws-load-balancer-backend-protocol: ssl
+spec:
+  type: ClusterIP
+  # loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: authorium-sidekiq
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  

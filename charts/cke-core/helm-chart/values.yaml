@@ -1,0 +1,236 @@
+services:
+
+  ckecore:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 8081
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "8000"
+        - name: NGINX_PORT
+          value: "8081"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        #repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/highsec-cke"
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/cke-core"
+        #tag: "4.20.0-202507.2240"
+        tag: "4.25.3-202510.2654"
+        pullPolicy: Always
+      containerPort: 8000
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "4096m"
+          memory: "8192Mi"
+      annotations: {}
+      config:
+        env:
+        - name: CONFIG_ENV
+          value: "staging"
+        - name: USE_FIPS
+          value: "true"
+        - name: AWS_DEFAULT_REGION
+          value: "us-gov-west-1"
+        - name: AWS_REGION
+          value: "us-gov-west-1"
+        - name: AWS_USE_FIPS_ENDPOINTS
+          value: "true"
+        - name: AWS_S3_FORCE_PATH_STYLE
+          value: "true"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        - name: AWS_ROLE_ARN
+          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-fedstart-default-role-04770bd5"
+        - name: REDIS_TLS_ENABLE
+          value: "true"
+        - name: REDIS_DISABLE_DNS_LOOKUP
+          value: "true"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: DATABASE_HOST
+          value: "rds391c760e-etl-data-stg-3p01.cz2bq9mukrhe.us-gov-west-1.rds.amazonaws.com"
+        - name: REDIS_HOST
+          value: "cke-core-redis-master.authorium.svc.cluster.local"
+        - name: DATABASE_DATABASE
+          value: "etldatastg3p01"
+        - name: STORAGE_DRIVER
+          value: s3
+        - name: DATABASE_DRIVER
+          value: postgres
+        - name: DATABASE_SCHEMA
+          value: "public"
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: REDIS_TLS_CA
+          value: "/etc/ssl/tls.crt"
+        - name: REDIS_TLS_KEY
+          value: "/etc/ssl/tls.key"
+        - name: NODE_EXTRA_CA_CERTS
+          value: "/usr/local/share/ca-certificates/fed-ca.pem"
+        - name: DATABASE_SSL_ENABLE
+          value: "true"
+        - name: STORAGE_REGION
+          value: "us-gov-west-1"
+        - name: STORAGE_ENDPOINT
+          value: "https://s3-fips.us-gov-west-1.amazonaws.com"
+        - name: COLLABORATION_STORAGE_ENDPOINT
+          value: "https://s3-fips.us-gov-west-1.amazonaws.com"
+        - name: COLLABORATION_STORAGE_REGION
+          value: "us-gov-west-1"
+        - name: COLLABORATION_STORAGE_DRIVER
+          value: s3
+        - name: LOG_LEVEL
+          value: "30"
+        - name: PUPPETEER_DISABLE_SANDBOX
+          value: "true"
+        - name: PUPPETEER_ARGS
+          value: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+        secrets:
+          LICENSE_KEY:
+            name: cke-core-secrets
+            key: CS_LICENSE_KEY
+          REDIS_PASSWORD:
+            name: cke-core-redis
+            key: redis-password
+          DATABASE_PASSWORD:
+            name: cke-core-secrets
+            key: CS_DATABASE_PASSWORD
+          DATABASE_USER:
+            name: cke-core-secrets
+            key: CS_DATABASE_USER
+          STORAGE_BUCKET:
+            name: cke-core-secrets
+            key: CS_STORAGE_BUCKET
+          COLLABORATION_STORAGE_BUCKET:
+            name: cke-core-secrets
+            key: CS_COLLABORATION_BUCKET
+          ENVIRONMENTS_MANAGEMENT_SECRET_KEY:
+            name: cke-core-secrets
+            key: CS_MANAGEMENT_SECRET
+
+
+    service:
+      type: ClusterIP
+      loadBalancerClass: service.k8s.aws/nlb
+      port: 443  
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[
+              {
+                "name":"http-svc",
+                "prefix":"/",
+                "domain-aliases":["CKEDITOR"]
+              }
+            ]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+
+    #service:
+    #  type: ClusterIP
+    #  port: 443  
+    #  annotations:
+    #    com.palantir.rubix.service.spp/v3: >
+    #      {
+    #          "endpoints":[
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/cke-core/",
+    #              "rewrite-prefix":"/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/info-pages/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/panel/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/check",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/license",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/environments",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/environments/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/easyimage/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/organization/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/api/v5/",
+    #              "rewrite-prefix":"/cke-core/api/v5/",
+    #              "domain-aliases":["DEFAULT"]
+    #            },
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/api/v5/M_mG0i9suyGnMUe5n4A4/",
+    #              "rewrite-prefix":"/cke-core/api/v5/M_mG0i9suyGnMUe5n4A4/",
+    #              "domain-aliases":["DEFAULT"]
+    #            }
+    #          ]
+    #      }
+    #    com.palantir.rubix.service/pod-cert: '{}'
+
+    #service:
+    #  type: ClusterIP
+    #  port: 443  
+    #  annotations:
+    #    com.palantir.rubix.service.spp/v3: >
+    #      {
+    #          "endpoints":[
+    #            {
+    #              "name":"http-svc",
+    #              "prefix":"/",
+    #              "domain-aliases":["DEFAULT"]
+    #            }
+    #          ]
+    #      }
+    #    com.palantir.rubix.service/pod-cert: '{}'

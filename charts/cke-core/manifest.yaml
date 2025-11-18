@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ckeditor
+  namespace: duploservices-stg-3p01
+  labels:
+    app: ckeditor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ckeditor
+  template:
+    metadata:
+      labels:
+        app: ckeditor
+    spec:
+      nodeSelector:
+        tenantname: duploservices-stg-3p01
+      containers:
+        - name: ckeditor
+          image: 070029289390.dkr.ecr.us-gov-west-1.amazonaws.com/highsec-cke:4.17.3-202411.1373
+          ports:
+            - containerPort: 8081
+              protocol: TCP          
+          env:
+            - name: CONFIG_ENV
+              value: "staging"
+            - name: REDIS_TLS_ENABLE
+              value: "true"
+            - name: REDIS_DISABLE_DNS_LOOKUP
+              value: "true"
+            # - name: DB_HOST ###Environment variables are baked into the age ###
+            #   value: "duplostg-3p01-cke.cfad7etsnpmr.us-gov-west-1.rds.amazonaws.com"  
+            # - name: DB_PORT
+            #   value: "3306"
+            # - name: DB_NAME
+            #   value: "duplostg-3p01-cke"
+            # - name: DB_USER
+            #   valueFrom:
+            #    secretKeyRef:
+            #      name: rds-credentials ckeuser
+            #      key: username
+            # - name: DB_PASSWORD
+            #   valueFrom:
+            #    secretKeyRef:
+            #      name: rds-credentials
+            #      key: password
+          resources:
+            requests:
+              cpu: "2048m"
+              memory: "4096Mi"          
+            limits:
+              cpu: "4096m"
+              memory: "8192Mi"  
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 10
+            timeoutSeconds: 5
+          volumeMounts: []
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ckeditor-service
+  namespace: duploservices-stg-3p01
+  labels:
+    app: ckeditor
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-00507881a9d442a00, subnet-0c4b81b03e65a4ebf
+    external-dns.alpha.kubernetes.io/hostname: stg-3p01-ckeditor.authorium.com
+    service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "false"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-security-groups: sg-0bf3248f559608753, sg-07e88d2f9bdb09a92
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws-us-gov:acm:us-gov-west-1:070029289390:certificate/33353efb-210b-4a9b-80c4-7df5a5eca554"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: ssl
+    # service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: ckeditor
+  ports:
+    - port: 443
+      targetPort: 8081
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ckeditor-log-config
+  namespace: duploservices-stg-3p01
+data:
+  awslogs-group: "/ecs/duploservices-stg-3p01-ckeditor"
+  awslogs-create-group: "true"
+  awslogs-region: "us-gov-west-1"
+  awslogs-stream-prefix: "ecs"

@@ -1,0 +1,17 @@
+{{- if .Values.services.formioenterprise.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-pvc
+  namespace: {{ .Values.services.formioenterprise.namespace }}
+  labels:
+    app: formio-enterprise
+spec:
+  accessModes:
+    - ReadWriteOnce
+  #volumeName: {{ .Release.Name }}-pv
+  storageClassName: {{ .Values.services.formioenterprise.storage.storageClassName }}
+  resources:
+    requests:
+      storage: 5Gi
+{{ end }}

@@ -1,0 +1,102 @@
+services:
+
+  formioenterprise:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "8080"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    serviceaccount:
+      name: s3-service-account
+      automountServiceAccountToken: true
+
+    deployment:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/form-io-enterprise"
+        tag: "v.9.6.4-202510.2570"
+        pullPolicy: Always
+      containerPort: 8080
+      resources:
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      annotations: {}
+      config:
+        env:
+        - name: PORT
+          value: "8080"
+        - name: DEBUG
+          value: "*.*"
+        - name: PDF_SERVER
+          value: "https://authorium-pdf-stg.palantirfedstart.com/"
+        - name: PORTAL_ENABLED
+          value: "1"
+        - name: NODE_EXTRA_CA_CERTS
+          value: /opt/ca/fed-ca.pem
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        - name: AWS_ROLE_ARN
+          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-fedstart-default-role-04770bd5"
+        - name: AWS_USE_FIPS_ENDPOINT
+          value: "true"          
+        secrets:
+          MONGO:
+            name: formio-enterprise-secrets
+            key: MONGO
+          LICENSE_KEY:
+            name: formio-enterprise-secrets
+            key: LICENSE_KEY
+          PORTAL_SECRET:
+            name: formio-enterprise-secrets
+            key: PORTAL_SECRET
+          DB_SECRET:
+            name: formio-enterprise-secrets
+            key: DB_SECRET
+          JWT_SECRET:
+            name: formio-enterprise-secrets
+            key: FORMIO_JWT_SECRET_KEY
+          ADMIN_EMAIL:
+            name: formio-enterprise-secrets
+            key: ADMIN_EMAIL
+          ADMIN_PASS:
+            name: formio-enterprise-secrets
+            key: ADMIN_PASS
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[{
+                  "name":"http-svc",
+                  "prefix":"/",
+                  "domain-aliases":["FORMIO-ENTERPRISE"]
+              }]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'

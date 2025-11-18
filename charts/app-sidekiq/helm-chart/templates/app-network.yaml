@@ -1,0 +1,29 @@
+{{- if .Values.services.authoriumapp.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.authoriumapp.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: server
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.authoriumapp.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.services.authoriumapp.service.type | default "ClusterIP" }}
+  {{- if eq .Values.services.authoriumapp.service.type "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.authoriumapp.service.loadBalancerClass }}
+  {{- end }}
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - name: http-svc
+      port: {{ .Values.services.authoriumapp.service.port }}
+      targetPort: {{ .Values.services.authoriumapp.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}

@@ -1,0 +1,20 @@
+{{- if .Values.services.formioenterprise.create }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-pv
+  namespace: {{ .Values.services.formioenterprise.namespace }}
+  labels:
+    app: formio-enterprise
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  storageClassName: {{ .Values.services.formioenterprise.storage.storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  #csi:
+  #  driver: efs.csi.aws.com
+  #  volumeHandle: {{ .Values.services.formioenterprise.storage.efsid }}
+{{ end }}

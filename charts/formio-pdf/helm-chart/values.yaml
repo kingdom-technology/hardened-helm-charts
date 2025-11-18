@@ -1,0 +1,114 @@
+services:
+
+  formiopdf:
+    create: true
+
+    namespace: authorium
+
+    deployment_nginx:
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        tag: "1.29.3-202511.2725-alpine"
+        pullPolicy: Always
+      containerPort: 9443
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      annotations: {}
+      config:
+        env:
+        - name: APP_PORT
+          value: "4005"
+        - name: NGINX_PORT
+          value: "9443"
+        - name: APP_PROTOCOL
+          value: "http"
+        - name: SSL_CERT
+          value: tls
+
+    deployment:
+      replicas: 1
+      image:
+        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/formio-pdf-server"
+        tag: "5.11.1-202511.2773"
+        pullPolicy: Always
+      containerPort: 4005
+      resources:
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      annotations: {}
+      config:
+        env:
+        - name: FORMIO_PDF_PORT
+          value: "4005"
+        - name: FORMIO_S3_BUCKET
+          value: "391c760e-formio-storage20250708190137117900000001"
+        - name: FORMIO_S3_REGION
+          value: "us-gov-west-1"
+        - name: DEBUG
+          value: "pdf.*"
+        - name: AWS_DEFAULT_REGION
+          value: "us-gov-west-1"
+        - name: AWS_REGION
+          value: "us-gov-west-1"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        - name: AWS_ROLE_ARN
+          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-fedstart-default-role-04770bd5"
+
+        secrets:
+          MONGO:
+            name: formio-enterprise-secrets
+            key: MONGO
+          DB_SECRET:
+            name: formio-enterprise-secrets
+            key: DB_SECRET
+          LICENSE_KEY:
+            name: formio-pdf-secrets
+            key: LICENSE_KEY
+          FORMIO_PDF_ADMINKEY:
+            name: formio-pdf-secrets
+            key: PDF_ADMINKEY
+          #FORMIO_S3_KEY:
+          #  name: formio-pdf-secrets
+          #  key: FORMIO_S3_KEY
+          #FORMIO_S3_SECRET:
+          #  name: formio-pdf-secrets
+          #  key: FORMIO_S3_SECRET
+          PDF_BROWSER_TIMEOUT:
+            name: formio-pdf-secrets
+            key: PDF_BROWSER_TIMEOUT
+
+    service:
+      type: ClusterIP
+      port: 443
+      annotations:
+        com.palantir.rubix.service.spp/v3: >
+          {
+              "endpoints":[{
+                  "name":"http-svc",
+                  "prefix":"/",
+                  "domain-aliases":["FORMIO-PDF"]
+              }]
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+
+    #service:
+    #  type: ClusterIP
+    #  port: 443
+    #  annotations:
+    #    com.palantir.rubix.service.spp/v3: >
+    #      {
+    #          "endpoints":[{
+    #              "name":"http-svc",
+    #              "prefix":"/formio-pdf/",
+    #              "rewrite-prefix":"/",
+    #              "domain-aliases":["DEFAULT"]
+    #          }]
+    #      }
+    #    com.palantir.rubix.service/pod-cert: '{}'

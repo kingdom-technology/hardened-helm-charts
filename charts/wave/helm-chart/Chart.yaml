@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: "2.0.0"
+name: wave
+description: Helm chart for wave deployment
+version: 0.2.9

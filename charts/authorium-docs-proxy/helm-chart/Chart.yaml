@@ -1,0 +1,5 @@
+apiVersion: v2
+name: authorium-docs-proxy
+description: Helm chart for deploying Authorium Docs proxy
+version: 0.5.39
+appVersion: "1.0.11"

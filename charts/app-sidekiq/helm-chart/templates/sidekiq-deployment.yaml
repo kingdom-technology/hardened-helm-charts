@@ -1,0 +1,177 @@
+{{- if .Values.services.sidekiq.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidekiq
+  namespace: {{ .Values.services.sidekiq.namespace }}
+  labels:
+    app: sidekiq
+    app.kubernetes.io/instance: sidekiq
+    app.kubernetes.io/name: sidekiq
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.sidekiq.deployment.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.services.sidekiq.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: sidekiq
+  template:
+    metadata:
+      labels:
+        app: sidekiq
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.pod/sls-service-info-v2: |
+          {
+            "ServiceName": "{{ .Release.Name }}",
+            "ServiceID": "{{ .Release.Namespace }}-{{ .Release.Name }}",
+            "StackName": "{{ .Release.Namespace }}",
+            "StackID": "{{ .Release.Namespace }}",
+            "Containers": {
+              "authorium-app-sidekiq": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              }              
+            }
+          }
+        com.palantir.rubix.service/pod-cert: '{}'         
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: s3-service-account        
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: com.palantir.rubix/instance-group
+                    operator: In
+                    values:
+                      - fedstart
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: topology.kubernetes.io/zone
+              weight: 100
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/instance
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      initContainers:
+        - name: ca-bundle
+          image: "{{ .Values.services.authoriumapp.deployment.image.repository }}:{{ .Values.services.authoriumapp.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.authoriumapp.deployment.image.pullPolicy | default "IfNotPresent" }}
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              set -euo pipefail
+              SYS="/etc/ssl/certs/ca-certificates.crt"   # Ubuntu/Debian path
+              OUT="/etc/ssl/custom/combined.pem"
+              mkdir -p /etc/ssl/custom
+              cp "$SYS" "$OUT"
+              # Append Redis CA if present
+              if [ -s /etc/ssl/ca.crt ]; then
+                echo >> "$OUT"; cat /etc/ssl/ca.crt >> "$OUT"
+              fi
+              # Append your external/fed CA if present
+              if [ -s /usr/local/share/ca-certificates/fed-ca.pem ]; then
+                echo >> "$OUT"; cat /usr/local/share/ca-certificates/fed-ca.pem >> "$OUT"
+              fi
+              echo "Combined bundle ready at $OUT"
+          volumeMounts:
+            - name: ca-bundle
+              mountPath: /etc/ssl/custom
+            - name: redis-ca
+              mountPath: /etc/redis/ca
+              readOnly: true
+            - name: external-ca-bundle
+              mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+              subPath: ca.pem
+              readOnly: true
+
+      containers:
+        - name: sidekiq
+          image: "{{ .Values.services.sidekiq.deployment.image.repository }}:{{ .Values.services.sidekiq.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.sidekiq.deployment.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.sidekiq.deployment.containerPort }}
+              protocol: TCP
+          command:
+            - "bundle"
+            - "exec"
+            - "sidekiq"
+          volumeMounts:
+            - name: ca-bundle
+              mountPath: /etc/ssl/custom          
+            - name: redis-ca
+              mountPath: /etc/redis/ca
+              readOnly: true
+            - name: external-ca-bundle
+              mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+              subPath: ca.pem
+              readOnly: true
+          env:
+            {{- range .Values.services.authoriumapp.deployment.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+            {{- range $key, $value := .Values.services.authoriumapp.deployment.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+          resources:
+            limits:
+              cpu: {{ .Values.services.sidekiq.deployment.resources.limits.cpu }}
+              memory: {{ .Values.services.sidekiq.deployment.resources.limits.memory }}
+      volumes:
+        - name: redis-ca
+          secret:
+            secretName:  cert-authorium-app-redis-4
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+        - name: external-ca-bundle
+          configMap:
+            name: tls-external-ca-bundle
+            items:
+              - key: ca.pem
+                path: ca.pem
+        - name: ca-bundle
+          emptyDir: {} 
+        #- name: nginx-config-volume
+        #  configMap:
+        #    name: {{ .Release.Name }}-nginx-config
+        #    items:
+        #    - key: nginx.conf
+        #      path: nginx.conf
+{{ end }}

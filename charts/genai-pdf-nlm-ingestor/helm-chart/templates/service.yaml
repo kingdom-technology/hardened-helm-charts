@@ -1,0 +1,27 @@
+{{- if .Values.services.genaipdf.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.genaipdf.namespace }}
+  labels:
+    app: genai-pdf-nlm-ingestor
+  {{- with .Values.services.genaipdf.service.annotations }}    
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.services.genaipdf.service.type | default "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.genaipdf.service.loadBalancerClass }}  
+  selector:
+    app: genai-pdf-nlm-ingestor
+spec:
+  type: {{ .Values.services.genaipdf.service.type }}
+  loadBalancerClass: {{ .Values.services.genaipdf.service.loadBalancerClass }}  
+  selector:
+    app: genai-pdf-nlm-ingestor
+  ports:
+    - port: {{ .Values.services.genaipdf.service.port }}
+      targetPort: {{ .Values.services.genaipdf.deployment.containerPort }}
+      protocol: TCP
+{{ end }}

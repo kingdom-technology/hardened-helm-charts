@@ -1,0 +1,272 @@
+{{- if .Values.services.etlworks.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.etlworks.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.etlworks.deployment.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}  
+spec:
+  replicas: {{ .Values.services.etlworks.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/component: server
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.pod/sls-service-info-v2: |
+          {
+            "ServiceName": "{{ .Release.Name }}",
+            "ServiceID": "{{ .Release.Namespace }}-{{ .Release.Name }}",
+            "StackName": "{{ .Release.Namespace }}",
+            "StackID": "{{ .Release.Namespace }}",
+            "Containers": {
+              "nginx": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              },
+              "etlworks": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              }              
+            }
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: s3-service-account
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: com.palantir.rubix/instance-group
+                    operator: In
+                    values:
+                      - fedstart
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: topology.kubernetes.io/zone
+              weight: 100
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/instance
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              
+      initContainers:
+        - name: license-downloader
+          image: "{{ .Values.services.etlworks.deployment.image.repository }}:{{ .Values.services.etlworks.deployment.image.tag }}"
+          command: {{ .Values.services.etlworks.deployment.init.config.command | toJson }}
+          args: {{ .Values.services.etlworks.deployment.init.config.args | toJson }}
+          volumeMounts:
+            - name: etlworks-storage
+              mountPath: /opt/etlworks/data
+            - name: tls-secret-volume
+              mountPath: /etc/ssl/
+              readOnly: true
+            - name: external-ca-bundle
+              mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+              subPath: ca.pem
+              readOnly: true
+          env:
+            {{- range $key, $value := .Values.services.etlworks.deployment.init.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.etlworks.deployment.init.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+
+      containers:        
+        - name: nginx
+          image: "{{ .Values.services.etlworks.deployment_nginx.image.repository }}:{{ .Values.services.etlworks.deployment_nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.services.etlworks.deployment_nginx.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.etlworks.deployment_nginx.containerPort }}
+              protocol: TCP
+              name: http-svc
+          volumeMounts:
+            - name: tls-secret-volume
+              mountPath: /etc/ssl/
+              readOnly: true
+          env:
+            {{- range $key, $value := .Values.services.etlworks.deployment_nginx.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.etlworks.deployment_nginx.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.services.etlworks.deployment_nginx.resources.requests.memory }}
+              cpu: {{ .Values.services.etlworks.deployment_nginx.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.services.etlworks.deployment_nginx.resources.limits.memory }}
+              cpu: {{ .Values.services.etlworks.deployment_nginx.resources.limits.cpu }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+        
+        - name: etlworks
+          image: "{{ .Values.services.etlworks.deployment.image.repository }}:{{ .Values.services.etlworks.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.etlworks.deployment.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.etlworks.deployment.containerPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: etlworks-storage
+              mountPath: /opt/etlworks/data
+            - name: redis-ca
+              mountPath: /etc/ssl/
+              readOnly: true 
+            - name: external-ca-bundle
+              mountPath: /usr/local/share/ca-certificates/fed-ca.pem
+              subPath: ca.pem
+              readOnly: true
+            - name: external-ca-jks-bundle
+              mountPath: /tmp/truststore.jks
+              subPath: truststore.jks
+              readOnly: true
+            ## Only use this for testing the entrypoint.sh script
+            # - name: entrypoint-config-volume
+            #   mountPath: /opt/etlworks/entrypoint.sh
+            #   subPath: entrypoint.sh
+            #   readOnly: true
+            - name: download-config-volume
+              mountPath: /opt/etlworks/download.sh
+              subPath: download.sh
+              readOnly: true
+          env:
+            {{- range $key, $value := .Values.services.etlworks.deployment.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.etlworks.deployment.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.services.etlworks.deployment.resources.requests.memory }}
+              cpu: {{ .Values.services.etlworks.deployment.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.services.etlworks.deployment.resources.limits.memory }}
+              cpu: {{ .Values.services.etlworks.deployment.resources.limits.cpu }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 3000
+            runAsGroup: 3000
+            ##fsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: etlworks-storage
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-pvc
+        - name: tls-secret-volume
+          secret:
+            secretName: cert-etlworks-app
+        - name: redis-ca
+          secret:
+            secretName:  cert-etlworks-redis-4
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        - name: external-ca-bundle
+          configMap:
+            name: tls-external-ca-bundle
+            items:
+              - key: ca.pem
+                path: ca.pem
+        - name: external-ca-jks-bundle
+          configMap:
+            name: tls-external-ca-jks-bundle
+            items:
+              - key: truststore.jks
+                path: truststore.jks
+        ## Only use this for testing the entrypoint.sh script
+        # - name: entrypoint-config-volume
+        #   configMap:
+        #     name: {{ .Release.Name }}-entrypoint-config
+        #     defaultMode: 0755
+        #     items:
+        #     - key: entrypoint.sh
+        #       path: entrypoint.sh
+        - name: download-config-volume
+          configMap:
+            name: {{ .Release.Name }}-download-config
+            defaultMode: 0755
+            items:
+            - key: download.sh
+              path: download.sh
+{{ end }}

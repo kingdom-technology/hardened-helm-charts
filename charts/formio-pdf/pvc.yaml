@@ -1,0 +1,17 @@
+{{- if .Values.services.formiopdf.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-formiopdf-pvc
+  namespace: {{ .Values.services.formiopdf.namespace }}
+  labels:
+    app: formio-pdf-server
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeName: {{ .Release.Name }}-formiopdf-pv
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 5Gi
+{{ end }}

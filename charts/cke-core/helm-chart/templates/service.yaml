@@ -1,0 +1,29 @@
+{{- if .Values.services.ckecore.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.ckecore.namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: server
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.ckecore.service.annotations }}    
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec: 
+  type: {{ .Values.services.ckecore.service.type | default "ClusterIP" }}
+  {{- if eq .Values.services.ckecore.service.type "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.ckecore.service.loadBalancerClass }}
+  {{- end }}
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - name: http-svc  
+      port: {{ .Values.services.ckecore.service.port }}
+      targetPort: {{ .Values.services.ckecore.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}      

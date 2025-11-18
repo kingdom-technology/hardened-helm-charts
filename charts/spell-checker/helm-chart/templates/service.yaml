@@ -1,0 +1,30 @@
+{{- if and .Values.services .Values.services.spellchecker .Values.services.spellchecker.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.services.spellchecker.namespace }}
+  labels:
+    app: spellchecker
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: spellchecker
+    app.kubernetes.io/component: server
+    rubix-app: {{ .Chart.Name }}
+  {{- with .Values.services.spellchecker.service.annotations }}    
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec: 
+  type: {{ .Values.services.spellchecker.service.type | default "ClusterIP" }}
+  {{- if eq .Values.services.spellchecker.service.type "LoadBalancer" }}
+  loadBalancerClass: {{ .Values.services.spellchecker.service.loadBalancerClass }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: spellchecker
+  ports:
+    - name: http-svc
+      port: {{ .Values.services.spellchecker.service.port }}
+      targetPort: {{ .Values.services.spellchecker.deployment_nginx.containerPort }}
+      protocol: TCP
+{{ end }}

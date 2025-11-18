@@ -1,0 +1,100 @@
+{{- if .Values.services.genaiembeddings.create }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-genai-embeddings-inference
+  namespace: {{ .Values.services.genaiembeddings.namespace }}
+  labels:
+    app: genai-embeddings
+    rubix-app: {{ .Chart.Name }}    
+  {{- with .Values.services.genaiembeddings.deployment.annotations }}
+  annotations: 
+    {{- toYaml . | nindent 4 }}
+  {{- end }}      
+spec:
+  replicas: {{ .Values.services.genaiembeddings.replicas }}
+  selector:
+    matchLabels:
+      app: genai-embeddings
+  template:
+    metadata:
+      labels:
+        app: genai-embeddings
+        rubix-app: {{ .Chart.Name }}
+      annotations:
+        com.palantir.rubix.pod/sls-service-info-v2: |
+          {
+            "ServiceName": "{{ .Release.Name }}",
+            "ServiceID": "{{ .Release.Namespace }}-{{ .Release.Name }}",
+            "StackName": "{{ .Release.Namespace }}",
+            "StackID": "{{ .Release.Namespace }}",
+            "Containers": {
+              "container-name": {
+                "ProductName": "{{ .Chart.Name }}",
+                "ProductVersion": "{{ .Chart.AppVersion }}"
+              }
+            }
+          }
+        com.palantir.rubix.service/pod-cert: '{}'
+    spec:
+      nodeSelector:
+      {{ toYaml .Values.services.genaiembeddings.nodeSelector | indent 8 }}
+      containers:
+        - name: nginx
+          image: "{{ .Values.services.genaiembeddings.deployment_nginx.image.repository }}:{{ .Values.services.genaiembeddings.deployment_nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.services.genaiembeddings.deployment_nginx.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.services.genaiembeddings.deployment_nginx.containerPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: tls-secret-volume
+              mountPath: /etc/ssl/
+              readOnly: true                 
+          env:
+            {{- range $key, $value := .Values.services.genaiembeddings.deployment_nginx.config.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.name }}
+                  key: {{ $value.key }}
+            {{- end }}
+            {{- range .Values.services.genaiembeddings.deployment_nginx.config.env }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.services.genaiembeddings.deployment_nginx.resources.requests.memory }}
+              cpu: {{ .Values.services.genaiembeddings.deployment_nginx.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.services.genaiembeddings.deployment_nginx.resources.limits.memory }}
+              cpu: {{ .Values.services.genaiembeddings.deployment_nginx.resources.limits.cpu }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault           
+
+        - name: genai-embeddings
+          image: "{{ .Values.services.genaiembeddings.deployment.image.repository }}:{{ .Values.services.genaiembeddings.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.services.genaiembeddings.deployment.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.genaiembeddings.deployment.containerPort }}
+              protocol: TCP
+          #args:
+          #  - "--model-id=BAAI/bge-large-en-v1.5"
+          #  - "--port=8080"
+          #  - "--json-output"
+          resources:
+            limits:
+              cpu: {{ .Values.services.genaiembeddings.deployment.resources.limits.cpu }}
+              memory: {{ .Values.services.genaiembeddings.deployment.resources.limits.memory }}
+          securityContext: {}
+      volumes:
+        - name: tls-secret-volume
+          secret:
+            secretName: cert-genai-embeddings-inference
+{{ end }}
