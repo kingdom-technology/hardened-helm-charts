@@ -1,1 +1,0 @@
-helm install -n duploservices-stg-3p01 cke-core cke-core/ckeditor-core -f values.yaml 

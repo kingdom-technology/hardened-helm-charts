@@ -1,5 +1,0 @@
-apiVersion: v2
-name: cke-core
-description: Helm chart for CKEditor deployment
-version: 0.0.161
-appVersion: "4.25.2"
