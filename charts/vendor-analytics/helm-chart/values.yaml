@@ -1,6 +1,6 @@
 services:
 
-  metabase:
+  analytics:
     create: true
 
     namespace: authorium
@@ -8,7 +8,7 @@ services:
     deployment_nginx:
       replicas: 1
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
         tag: "1.29.3-202511.2725-alpine"
         pullPolicy: Always
       containerPort: 9443
@@ -34,7 +34,7 @@ services:
     deployment:
       replicas: 1
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/metabase"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/vendor/analytics"
         tag: "v1.55.18.1-202510.2583"
         pullPolicy: Always
       containerPort: 3000
@@ -49,16 +49,16 @@ services:
       config:
         secrets:
           MB_DB_HOST:
-            name: metabase-secrets
+            name: analytics-secrets
             key: ETLWORKS_HOST
           MB_DB_USER:
-            name: metabase-secrets
+            name: analytics-secrets
             key: ETLWORKS_USERNAME
           MB_DB_PASS:
-            name: metabase-secrets
+            name: analytics-secrets
             key: ETLWORKS_PASSWORD
           MB_PREMIUM_EMBEDDING_TOKEN:
-            name: metabase-secrets
+            name: analytics-secrets
             key: TOKEN
         env:
         - name: MB_DB_TYPE
@@ -77,7 +77,7 @@ services:
               "endpoints":[{
                   "name":"http-svc",
                   "prefix":"/",
-                  "domain-aliases":["METABASE"]
+                  "domain-aliases":["analytics"]
               }]
           }
         com.palantir.rubix.service/pod-cert: '{}'

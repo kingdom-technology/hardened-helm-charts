@@ -47,7 +47,7 @@ services:
         - name: FORMIO_PDF_PORT
           value: "4005"
         - name: FORMIO_S3_BUCKET
-          value: "391c760e-formio-storage20250708190137117900000001"
+          value: "
         - name: FORMIO_S3_REGION
           value: "us-gov-west-1"
         - name: DEBUG
@@ -59,7 +59,7 @@ services:
         - name: AWS_WEB_IDENTITY_TOKEN_FILE
           value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
         - name: AWS_ROLE_ARN
-          value: "arn:aws-us-gov:iam::322658992871:role/391c760e-fedstart-default-role-04770bd5"
+          value: ""
 
         secrets:
           MONGO:
@@ -74,12 +74,6 @@ services:
           FORMIO_PDF_ADMINKEY:
             name: formio-pdf-secrets
             key: PDF_ADMINKEY
-          #FORMIO_S3_KEY:
-          #  name: formio-pdf-secrets
-          #  key: FORMIO_S3_KEY
-          #FORMIO_S3_SECRET:
-          #  name: formio-pdf-secrets
-          #  key: FORMIO_S3_SECRET
           PDF_BROWSER_TIMEOUT:
             name: formio-pdf-secrets
             key: PDF_BROWSER_TIMEOUT
@@ -97,18 +91,3 @@ services:
               }]
           }
         com.palantir.rubix.service/pod-cert: '{}'
-
-    #service:
-    #  type: ClusterIP
-    #  port: 443
-    #  annotations:
-    #    com.palantir.rubix.service.spp/v3: >
-    #      {
-    #          "endpoints":[{
-    #              "name":"http-svc",
-    #              "prefix":"/formio-pdf/",
-    #              "rewrite-prefix":"/",
-    #              "domain-aliases":["DEFAULT"]
-    #          }]
-    #      }
-    #    com.palantir.rubix.service/pod-cert: '{}'

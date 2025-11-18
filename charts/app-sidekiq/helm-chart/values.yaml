@@ -151,58 +151,58 @@ services:
             name: appsidekiq-redis-url
             key: REDIS_URL
           appsidekiq_ADMIN_PASSWORD:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: appsidekiq_ADMIN_PASSWORD
           DATABASE_HOST:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: appsidekiq_WEB_HOST
           DATA_WAREHOUSE_DATABASE_SCHEMA:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: DATA_WAREHOUSE_DATABASE_SCHEMA
           DATA_WAREHOUSE_DATABASE_URL:
-            name: appsidekiq-app-sidekiq-secrets
-            key: DATA_WAREHOUSE_DATABASE_URL            
+            name: appsidekiq-secrets
+            key: DATA_WAREHOUSE_DATABASE_URL
           DATABASE_PASSWORD:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: appsidekiq_WEB_PASSWORD
           RAILS_MASTER_KEY:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: RAILS_MASTER_KEY 
           FORMIO_ADMIN_ROLE_ID:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: FORMIO_ADMIN_ROLE_ID 
           FORMIO_JWT_SECRET_KEY:
             name: formio-enterprise-secrets
             key: FORMIO_JWT_SECRET_KEY
           FORMIO_PROJECT_ID:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: FORMIO_PROJECT_ID
           CKEDITOR_ENV_ID:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: CKEDITOR_ENV_ID
           CKEDITOR_SECRET_KEY:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: CKEDITOR_SECRET_KEY
           CKEDITOR_API_SECRET:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: CKEDITOR_API_SECRET
           CKEDITOR_EXPORT_DOCX_SECRET_KEY:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: CKEDITOR_EXPORT_DOCX_SECRET_KEY
           DOCUSIGN_BASE_URL:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: DOCUSIGN_BASE_URL
           APRYSE_LICENSE_KEY:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: APRYSE_LICENSE_KEY
           PG_LOCKS_MONITOR_SLACK_WEBHOOK_URL:
-            name: appsidekiq-app-sidekiq-secrets
+            name: appsidekiq-secrets
             key: PG_LOCKS_MONITOR_SLACK_WEBHOOK_URL
 
     service:
       type: ClusterIP
       loadBalancerClass: service.k8s.aws/nlb
-      port: 443  
+      port: 443
       annotations:
         com.palantir.rubix.service.spp/v3: >
           {
@@ -223,7 +223,6 @@ services:
       replicas: 1
       image:
         repository: <account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/appsidekiq-staging
-        #tag: "1.16.0-il5"
         tag: "1.14.3"
         pullPolicy: Always
       containerPort: 3000

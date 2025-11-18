@@ -1,5 +1,5 @@
 apiVersion: v2
-name: metabase
-description: Helm chart for deploying metabase
+name: analytics
+description: Helm chart for deploying analytics
 version: 0.1.5
 appVersion: "1.55.18.1"

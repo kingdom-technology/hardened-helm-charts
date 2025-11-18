@@ -1,5 +1,5 @@
 apiVersion: v2
 name: formio-pdf
-description: Helm chart for deploying formio-enterprise
+description: Helm chart for deploying formio-pdf
 version: 0.0.20
 appVersion: "5.11.1"

@@ -1,13 +1,13 @@
 services:
 
-  genaiapi: 
+  genaiimage:
     create: true
-      
-    namespace: authorium
+
+    namespace: <namespace
 
     deployment_nginx:
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
         tag: "1.29.3-202511.2725-alpine"
         pullPolicy: Always
       containerPort: 9443
@@ -33,10 +33,7 @@ services:
     deployment:
       replicas: 1
       image:
-        repository: 070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/docshunter-genai-ai-api
-        ##digest: "sha256:6a02d516d02c8cf70793a7dff256f67301973c0fca37a65475a4ebe2ac3db5f7"
-        tag: "0.1.5"
-        ##tag: "0.1.5"        
+        repository: <account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/<repo>
         pullPolicy: Always
       containerPort: 8000
       resources:
@@ -69,7 +66,7 @@ services:
         - name: PROMPT_TYPE
           value: TEXT_GENERATION
         - name: EMBEDDINGS_API_URL
-          value: https://ai-embed-inf-authorium-stg-01.secure.authorium.com/embed
+          value: ""
         - name: LLM_MODEL_ID
           value: anthropic.claude-3-5-sonnet-20240620-v1:0
         - name: APP_PORT
@@ -105,14 +102,4 @@ services:
       type: ClusterIP
       port: 443
       annotations:
-        # com.palantir.rubix.service.spp/v3: >
-        #        {
-        #            "endpoints":[{
-        #                "name":"http-svc",
-        #                "prefix":"/genai-api",
-        #                "prefix-rewrite":"/", 
-        #                "domain-aliases":["DEFAULT"]
-        #            }]
-        #        }
-           # This creates a secret called 'cert-<svc-name>' which is needed for frontdoor ingress
         com.palantir.rubix.service/pod-cert: '{}'

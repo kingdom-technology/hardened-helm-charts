@@ -31,7 +31,7 @@ spec:
             "StackName": "{{ .Release.Namespace }}",
             "StackID": "{{ .Release.Namespace }}",
             "Containers": {
-              "authorium-app-sidekiq": {
+              "appsidekiq-app-sidekiq": {
                 "ProductName": "{{ .Chart.Name }}",
                 "ProductVersion": "{{ .Chart.AppVersion }}"
               }              
@@ -152,7 +152,7 @@ spec:
       volumes:
         - name: redis-ca
           secret:
-            secretName:  cert-authorium-app-redis-4
+            secretName:  cert-appsidekiq-app-redis-4
             items:
               - key: tls.crt
                 path: tls.crt
