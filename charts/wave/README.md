@@ -1,1 +1,0 @@
-helm install -n duploservices-stg-3p01 wave wave/wave -f values.yaml

@@ -1,5 +1,0 @@
-apiVersion: v2
-name: smtp
-description: Helm chart for deploying smtp-sink (mailpit) in Authorium
-version: 0.0.1
-appVersion: "1.55.18"
