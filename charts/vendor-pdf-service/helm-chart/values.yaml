@@ -7,7 +7,7 @@ services:
 
     deployment_nginx:
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/nginx"
         tag: "1.29.3-202511.2725-alpine"
         pullPolicy: Always
       containerPort: 9443
@@ -33,7 +33,7 @@ services:
     deployment:
       replicas: 1
       image:
-        repository: "070029289390.dkr.ecr-fips.us-gov-west-1.amazonaws.com/formio-pdf-server"
+        repository: "<account_id>.dkr.ecr-fips.us-gov-west-1.amazonaws.com/formio-pdf-server"
         tag: "5.11.1-202511.2773"
         pullPolicy: Always
       containerPort: 4005

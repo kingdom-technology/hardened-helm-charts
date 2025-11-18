@@ -97,9 +97,6 @@ spec:
             - name: tls-secret-volume
               mountPath: /etc/ssl/
               readOnly: true
-            # - name: nginx-config-volume
-            #   mountPath: /etc/nginx/nginx.conf.template
-            #   subPath: nginx.conf              
           env:
             {{- range $key, $value := .Values.services.spellchecker.deployment_nginx.config.secrets }}
             - name: {{ $key }}
@@ -177,10 +174,4 @@ spec:
         - name: tls-secret-volume
           secret:
             secretName: cert-spell-checker
-        # - name: nginx-config-volume
-        #   configMap:
-        #     name: {{ .Release.Name }}-nginx-config
-        #     items:
-        #     - key: nginx.conf
-        #       path: nginx.conf            
 {{ end }}
